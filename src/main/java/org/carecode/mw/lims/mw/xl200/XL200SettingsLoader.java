@@ -1,4 +1,4 @@
-package org.carecode.mw.lims.mw.indiko;
+package org.carecode.mw.lims.mw.xl200;
 
 import com.google.gson.Gson;
 import java.io.FileReader;
@@ -9,16 +9,16 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.carecode.lims.libraries.MiddlewareSettings;
 
-public class SettingsLoader {
+public class XL200SettingsLoader {
 
-    private static final Logger logger = LogManager.getLogger(SettingsLoader.class);
+    private static final Logger logger = LogManager.getLogger(XL200SettingsLoader.class);
     private static MiddlewareSettings middlewareSettings;
 
     public static void loadSettings() {
         Gson gson = new Gson();
         try {
             // Read and print the contents of the config.json file
-            String filePath = "D:\\ccmw\\settings\\indikoPlus\\config.json";
+            String filePath = "D:\\ccmw\\settings\\xl200\\config.json";
             String jsonContent = new String(Files.readAllBytes(Paths.get(filePath)));
             System.out.println("Contents of config.json:");
             System.out.println(jsonContent);

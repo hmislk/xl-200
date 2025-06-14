@@ -1,4 +1,4 @@
-package org.carecode.mw.lims.mw.indiko;
+package org.carecode.mw.lims.mw.xl200;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -20,9 +20,9 @@ import org.carecode.lims.libraries.PatientRecord;
 import org.carecode.lims.libraries.QueryRecord;
 import org.carecode.lims.libraries.ResultsRecord;
 
-public class IndikoServer {
+public class XL200Server {
 
-    private static final Logger logger = LogManager.getLogger(IndikoServer.class);
+    private static final Logger logger = LogManager.getLogger(XL200Server.class);
 
     private static final char ENQ = 0x05;
     private static final char ACK = 0x06;
@@ -74,8 +74,8 @@ public class IndikoServer {
     
     
    public void start(int port) {
-       port = SettingsLoader.getSettings().getAnalyzerDetails().getAnalyzerPort();
-//        IndikoServer.port = port;  // Assign port to static variable for restart
+       port = XL200SettingsLoader.getSettings().getAnalyzerDetails().getAnalyzerPort();
+//        XL200Server.port = port;  // Assign port to static variable for restart
         try {
             serverSocket = new ServerSocket(port);
             logger.info("Server started on port " + port);
@@ -114,7 +114,7 @@ public class IndikoServer {
             Thread.sleep(2000);  // Pause for 2 seconds before restarting
 
             logger.info("Restarting server on port " + port + "...");
-            IndikoServer server = new IndikoServer();  // Create a new instance of IndikoServer
+            XL200Server server = new XL200Server();  // Create a new instance of XL200Server
             server.start(port);  // Restart server on the same port
             logger.info("Server restarted successfully.");
 
@@ -268,13 +268,13 @@ public class IndikoServer {
         logger.debug("Handling eot");
         logger.debug(respondingQuery);
         if (respondingQuery) {
-            patientDataBundle = LISCommunicator.pullTestOrdersForSampleRequests(patientDataBundle.getQueryRecords().get(0));
+            patientDataBundle = XL200LISCommunicator.pullTestOrdersForSampleRequests(patientDataBundle.getQueryRecords().get(0));
             logger.debug("Starting Transmission to send test requests");
             out.write(ENQ);
             out.flush();
             logger.debug("Sent ENQ");
         } else if (respondingResults) {
-            LISCommunicator.pushResults(patientDataBundle);
+            XL200LISCommunicator.pushResults(patientDataBundle);
         } else {
             logger.debug("Received EOT, ending session");
         }

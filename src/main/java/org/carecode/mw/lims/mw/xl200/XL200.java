@@ -1,4 +1,4 @@
-package org.carecode.mw.lims.mw.indiko;
+package org.carecode.mw.lims.mw.xl200;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -7,28 +7,28 @@ import org.carecode.lims.libraries.PatientRecord;
 import org.carecode.lims.libraries.QueryRecord;
 import org.carecode.lims.libraries.ResultsRecord;
 
-public class Indiko {
+public class XL200 {
 
     static boolean testingPullingTestOrders = false;
     static boolean testingPushingTestResults = false;
 
-    public static final Logger logger = LogManager.getLogger(Indiko.class);
+    public static final Logger logger = LogManager.getLogger(XL200.class);
     
-    private static IndikoServer server = new IndikoServer(); // Make the server instance static for restart
+    private static XL200Server server = new XL200Server(); // Make the server instance static for restart
 
     public static void main(String[] args) {
         if (testingPullingTestOrders) {
             logger.info("Loading settings...");
-            SettingsLoader.loadSettings();
+            XL200SettingsLoader.loadSettings();
             logger.info("Settings loaded successfully.");
             QueryRecord queryRecord = new QueryRecord(0, "101010", null, null);
             logger.info("queryRecord=" + queryRecord);
-            DataBundle pb = LISCommunicator.pullTestOrdersForSampleRequests(queryRecord);
+            DataBundle pb = XL200LISCommunicator.pullTestOrdersForSampleRequests(queryRecord);
             logger.info("pb = " + pb);
             System.exit(0);
         } else if (testingPushingTestResults) {
             logger.info("Loading settings...");
-            SettingsLoader.loadSettings();
+            XL200SettingsLoader.loadSettings();
             logger.info("Settings loaded successfully.");
             DataBundle pdb = new DataBundle();
             PatientRecord patientRecord = new PatientRecord(0, "1212", "1212", "Buddhika", "Ari", "Male", "Sinhalese", "19750914", "Galle", "0715812399", "Niluka GUnasekara");
@@ -41,35 +41,35 @@ public class Indiko {
             QueryRecord qr = new QueryRecord(0, "1101", "1101", "");
             pdb.getQueryRecords().add(qr);
 
-            LISCommunicator.pushResults(pdb);
+            XL200LISCommunicator.pushResults(pdb);
             System.exit(0);
         }
-        logger.info("Starting Indiko middleware...");
+        logger.info("Starting XL200 middleware...");
         try {
             logger.info("Loading settings...");
-            SettingsLoader.loadSettings();
+            XL200SettingsLoader.loadSettings();
             logger.info("Settings loaded successfully.");
         } catch (Exception e) {
             logger.error("Failed to load settings.", e);
             return;
         }
 
-        int port = SettingsLoader.getSettings().getAnalyzerDetails().getAnalyzerPort();
-        server = new IndikoServer();
+        int port = XL200SettingsLoader.getSettings().getAnalyzerDetails().getAnalyzerPort();
+        server = new XL200Server();
         server.start(port);
     }
 
     public static void restartServer() {
-        int port = SettingsLoader.getSettings().getAnalyzerDetails().getAnalyzerPort();
+        int port = XL200SettingsLoader.getSettings().getAnalyzerDetails().getAnalyzerPort();
         try {
             logger.info("Stopping server...");
-            server.stop(); // Implement the stop() method in IndikoServer to cleanly shut down the server
+            server.stop(); // Implement the stop() method in XL200Server to cleanly shut down the server
 
             logger.info("Waiting before restart...");
             Thread.sleep(2000); // Pause for 2 seconds before restarting
 
             logger.info("Restarting server on port " + port + "...");
-            server = new IndikoServer(); // Create a new instance of the server
+            server = new XL200Server(); // Create a new instance of the server
             server.start(port);
             logger.info("Server restarted successfully.");
 

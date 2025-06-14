@@ -1,4 +1,4 @@
-package org.carecode.mw.lims.mw.indiko;
+package org.carecode.mw.lims.mw.xl200;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -16,9 +16,9 @@ import java.util.List;
 import org.carecode.lims.libraries.DataBundle;
 import org.carecode.lims.libraries.QueryRecord;
 import org.carecode.lims.libraries.ResultsRecord;
-import static org.carecode.mw.lims.mw.indiko.Indiko.logger;
+import static org.carecode.mw.lims.mw.xl200.XL200.logger;
 
-public class LISCommunicator {
+public class XL200LISCommunicator {
 
 //    static boolean testing = true;
     private static final Gson gson = new Gson();
@@ -36,7 +36,7 @@ public class LISCommunicator {
 //        }
 
         try {
-            String postSampleDataEndpoint = SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl();
+            String postSampleDataEndpoint = XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl();
             System.out.println("postSampleDataEndpoint = " + postSampleDataEndpoint);
             URL url = new URL(postSampleDataEndpoint + "/test_orders_for_sample_requests");
             System.out.println("url = " + url);
@@ -49,7 +49,7 @@ public class LISCommunicator {
             // Convert QueryRecord to JSON
 
             DataBundle databundle = new DataBundle();
-            databundle.setMiddlewareSettings(SettingsLoader.getSettings());
+            databundle.setMiddlewareSettings(XL200SettingsLoader.getSettings());
             databundle.getQueryRecords().add(queryRecord);
             String jsonInputString = gson.toJson(databundle);
             System.out.println("jsonInputString = " + jsonInputString);
@@ -90,10 +90,10 @@ public class LISCommunicator {
     public static void pushResults(DataBundle patientDataBundle) {
         System.out.println("pushResults = ");
         try {
-            System.out.println("SettingsLoader.getSettings() = " + SettingsLoader.getSettings());
-            System.out.println("SettingsLoader.getSettings().getLimsSettings() = " + SettingsLoader.getSettings().getLimsSettings());
-            System.out.println("SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl() = " + SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl());
-            String pushResultsEndpoint = SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl() + "/test_results";
+            System.out.println("XL200SettingsLoader.getSettings() = " + XL200SettingsLoader.getSettings());
+            System.out.println("XL200SettingsLoader.getSettings().getLimsSettings() = " + XL200SettingsLoader.getSettings().getLimsSettings());
+            System.out.println("XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl() = " + XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl());
+            String pushResultsEndpoint = XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl() + "/test_results";
 
             
             for(ResultsRecord rr:patientDataBundle.getResultsRecords()){
@@ -110,7 +110,7 @@ public class LISCommunicator {
             conn.setRequestProperty("Accept", "application/json");
             conn.setDoOutput(true);
             // Serialize PatientDataBundle to JSON
-            patientDataBundle.setMiddlewareSettings(SettingsLoader.getSettings());
+            patientDataBundle.setMiddlewareSettings(XL200SettingsLoader.getSettings());
             String jsonInputString = gson.toJson(patientDataBundle);
             System.out.println("jsonInputString = " + jsonInputString);
             // Send the JSON in the request body
@@ -136,11 +136,11 @@ public class LISCommunicator {
 
                 // Optionally process the server response (if needed)
                 JsonObject responseObject = JsonParser.parseString(response.toString()).getAsJsonObject();
-                Indiko.logger.info("Response from server: " + responseObject.toString());
+                XL200.logger.info("Response from server: " + responseObject.toString());
 
 // Extract status
                 String status = responseObject.get("status").getAsString();
-                Indiko.logger.info("Status: " + status);
+                XL200.logger.info("Status: " + status);
 
 // Extract the list of ResultsRecord objects
                 Gson gson = new Gson();
@@ -155,7 +155,7 @@ public class LISCommunicator {
 
 // Log and process the ResultsRecord objects as needed
                 for (ResultsRecord record : resultsRecords) {
-                    Indiko.logger.info("Sample ID: " + record.getSampleId()
+                    XL200.logger.info("Sample ID: " + record.getSampleId()
                             + ", Test: " + record.getTestCode()
                             + ", Status: " + record.getStatus());
                 }
