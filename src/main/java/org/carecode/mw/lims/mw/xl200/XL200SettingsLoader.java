@@ -18,7 +18,7 @@ public class XL200SettingsLoader {
         Gson gson = new Gson();
         try {
             // Read and print the contents of the config.json file
-            String filePath = "D:\\ccmw\\settings\\xl200\\config.json";
+            String filePath = "C:\\CCMW\\SysmaxXS500i\\settings\\XL200\\config.json";
             String jsonContent = new String(Files.readAllBytes(Paths.get(filePath)));
             System.out.println("Contents of config.json:");
             System.out.println(jsonContent);
