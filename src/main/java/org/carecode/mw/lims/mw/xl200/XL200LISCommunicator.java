@@ -27,7 +27,7 @@ public class XL200LISCommunicator {
     private static final Gson gson = new Gson();
 
     public static DataBundle pullTestOrdersForSampleRequests(QueryRecord queryRecord) {
-        logger.info("pullTestOrdersForSampleRequests");
+        logger.debug("pullTestOrdersForSampleRequests");
 //        if (testing) {
 //            PatientDataBundle pdb = new PatientDataBundle();
 //            List<String> testNames = Arrays.asList("HDL", "RF2");
@@ -40,22 +40,23 @@ public class XL200LISCommunicator {
 
         try {
             String postSampleDataEndpoint = XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl();
-            logger.debug("postSampleDataEndpoint = " + postSampleDataEndpoint);
+            logger.debug("postSampleDataEndpoint = {}", postSampleDataEndpoint);
             URL url = new URL(postSampleDataEndpoint + "/test_orders_for_sample_requests");
-            logger.debug("url = " + url);
+            logger.debug("url = {}", url);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Accept", "application/json");
             conn.setDoOutput(true);
-            logger.debug("queryRecord = " + queryRecord);
+            logger.debug("queryRecord = {}", queryRecord);
             // Convert QueryRecord to JSON
 
             DataBundle databundle = new DataBundle();
             databundle.setMiddlewareSettings(XL200SettingsLoader.getSettings());
             databundle.getQueryRecords().add(queryRecord);
             String jsonInputString = gson.toJson(databundle);
-            logger.debug("jsonInputString = " + jsonInputString);
+            logger.debug("jsonInputString = {}", jsonInputString);
+            logger.debug("Sending POST to {} with payload {}", url, jsonInputString);
             // Send the request
             try (OutputStream os = conn.getOutputStream()) {
                 byte[] input = jsonInputString.getBytes("utf-8");
@@ -63,9 +64,8 @@ public class XL200LISCommunicator {
             }
 
             int responseCode = conn.getResponseCode();
-            logger.info("responseCode = " + responseCode);
+            logger.debug("HTTP responseCode = {}", responseCode);
             if (responseCode == HttpURLConnection.HTTP_OK) {
-                logger.info("OK responseCode = " + responseCode);
                 // Process response
                 BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
                 StringBuilder response = new StringBuilder();
@@ -75,13 +75,21 @@ public class XL200LISCommunicator {
                     response.append(inputLine);
                 }
                 in.close();
-                logger.debug("response.toString() = " + response.toString());
+                logger.debug("response.toString() = {}", response.toString());
                 // Convert the response to a PatientDataBundle object
                 DataBundle patientDataBundle = gson.fromJson(response.toString(), DataBundle.class);
-                logger.debug("patientDataBundle = " + patientDataBundle);
+                logger.debug("patientDataBundle = {}", patientDataBundle);
                 return patientDataBundle;
             } else {
-                logger.error("POST request failed. Response code: " + responseCode);
+                BufferedReader in = new BufferedReader(new InputStreamReader(conn.getErrorStream(), "utf-8"));
+                StringBuilder response = new StringBuilder();
+                String inputLine;
+
+                while ((inputLine = in.readLine()) != null) {
+                    response.append(inputLine);
+                }
+                in.close();
+                logger.error("POST request failed. Response code: {} body: {}", responseCode, response);
             }
         } catch (Exception e) {
             logger.error("Error pulling test orders", e);
@@ -91,22 +99,23 @@ public class XL200LISCommunicator {
     }
 
     public static void pushResults(DataBundle patientDataBundle) {
-        logger.info("pushResults = ");
+        logger.debug("pushResults");
         try {
-            logger.debug("XL200SettingsLoader.getSettings() = " + XL200SettingsLoader.getSettings());
-            logger.debug("XL200SettingsLoader.getSettings().getLimsSettings() = " + XL200SettingsLoader.getSettings().getLimsSettings());
-            logger.debug("XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl() = " + XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl());
+            logger.debug("XL200SettingsLoader.getSettings() = {}", XL200SettingsLoader.getSettings());
+            logger.debug("XL200SettingsLoader.getSettings().getLimsSettings() = {}", XL200SettingsLoader.getSettings().getLimsSettings());
+            logger.debug("XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl() = {}", XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl());
             String pushResultsEndpoint = XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl() + "/test_results";
+            logger.debug("pushResultsEndpoint = {}", pushResultsEndpoint);
 
             
-            for(ResultsRecord rr:patientDataBundle.getResultsRecords()){
-                logger.debug("rr value  = " + rr.getResultValue() + "");
-                logger.debug("rr value string = " + rr.getResultValueString());
+            for (ResultsRecord rr : patientDataBundle.getResultsRecords()) {
+                logger.debug("rr value = {}", rr.getResultValue());
+                logger.debug("rr value string = {}", rr.getResultValueString());
             }
             
             
             URL url = new URL(pushResultsEndpoint);
-            logger.debug("url = " + url);
+            logger.debug("url = {}", url);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
@@ -115,7 +124,8 @@ public class XL200LISCommunicator {
             // Serialize PatientDataBundle to JSON
             patientDataBundle.setMiddlewareSettings(XL200SettingsLoader.getSettings());
             String jsonInputString = gson.toJson(patientDataBundle);
-            logger.debug("jsonInputString = " + jsonInputString);
+            logger.debug("jsonInputString = {}", jsonInputString);
+            logger.debug("Sending POST to {} with payload {}", url, jsonInputString);
             // Send the JSON in the request body
             try (OutputStream os = conn.getOutputStream()) {
                 byte[] input = jsonInputString.getBytes("utf-8");
@@ -123,9 +133,8 @@ public class XL200LISCommunicator {
             }
 
             int responseCode = conn.getResponseCode();
-            logger.info("responseCode = " + responseCode);
+            logger.debug("HTTP responseCode = {}", responseCode);
             if (responseCode == HttpURLConnection.HTTP_OK) {
-                logger.info("ok");
                 BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
                 StringBuilder response = new StringBuilder();
                 String inputLine;
@@ -135,7 +144,7 @@ public class XL200LISCommunicator {
                 }
                 in.close();
 
-                logger.debug("response.toString() = " + response.toString());
+                logger.debug("Response body: {}", response);
 
                 // Optionally process the server response (if needed)
                 JsonObject responseObject = JsonParser.parseString(response.toString()).getAsJsonObject();
@@ -164,7 +173,15 @@ public class XL200LISCommunicator {
                 }
 
             } else {
-                logger.error("POST request failed. Response code: " + responseCode);
+                BufferedReader in = new BufferedReader(new InputStreamReader(conn.getErrorStream(), "utf-8"));
+                StringBuilder response = new StringBuilder();
+                String inputLine;
+
+                while ((inputLine = in.readLine()) != null) {
+                    response.append(inputLine);
+                }
+                in.close();
+                logger.error("POST request failed. Response code: {} body: {}", responseCode, response);
             }
         } catch (Exception e) {
             logger.error("Error pushing results", e);
