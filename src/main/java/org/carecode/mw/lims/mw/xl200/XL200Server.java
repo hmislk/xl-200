@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -147,16 +148,17 @@ public class XL200Server {
 
                 switch (data) {
                     case ENQ:
-//                        logger.debug("Received ENQ");
+                        logger.debug("Received ENQ (ASCII: " + (int) ENQ + ")");
                         out.write(ACK);
                         out.flush();
-//                        logger.debug("Sent ACK");
+                        logger.debug("Sent ACK (ASCII: " + (int) ACK + ")");
                         break;
                     case ACK:
-//                        logger.debug("ACK Received.");
+                        logger.debug("Received ACK (ASCII: " + (int) ACK + ")");
                         handleAck(clientSocket, out);
                         break;
                     case STX:
+                        logger.debug("Received STX (ASCII: " + (int) STX + ")");
                         inChecksum = true;
                         StringBuilder message = new StringBuilder();
                         asciiDebugInfo = new StringBuilder();  // To store ASCII values for debugging
@@ -168,14 +170,15 @@ public class XL200Server {
                             message.append((char) data);
                             asciiDebugInfo.append("[").append(data).append("] ");  // Append ASCII value in brackets
                         }
+                        logger.debug("Received ETX (ASCII: " + (int) ETX + ")");
                         logger.debug("Message received: " + message);
                         processMessage(message.toString(), clientSocket);
                         out.write(ACK);
                         out.flush();
-//                        logger.debug("Sent ACK after STX-ETX block");
+                        logger.debug("Sent ACK (ASCII: " + (int) ACK + ") after STX-ETX block");
                         break;
                     case EOT:
-//                        logger.debug("EOT Received");
+                        logger.debug("Received EOT (ASCII: " + (int) EOT + ")");
                         handleEot(out);
                         break;
                     default:
@@ -513,6 +516,8 @@ public class XL200Server {
                         if (resultRecord != null) {
                             getPatientDataBundle().getResultsRecords().add(resultRecord);
                             logger.debug("Result Record Parsed: " + resultRecord);
+                            logger.debug("Parsed sample ID: " + resultRecord.getSampleId()
+                                    + ", Test code: " + resultRecord.getTestCode());
                         }
                     } catch (Exception ex) {
                         logger.error("Failed to parse result record: " + data, ex);
@@ -528,6 +533,15 @@ public class XL200Server {
                     queryRecord = parseQueryRecord(data);
                     getPatientDataBundle().getQueryRecords().add(queryRecord);
                     logger.debug("Parsed the Query Record: " + queryRecord);
+                    try {
+                        logger.debug("Parsed sample ID: " + queryRecord.getSampleId());
+                    } catch (Exception e) {
+                        logger.debug("Could not log parsed sample ID", e);
+                    }
+                    List<String> queryTests = extractTestCodesFromQueryRecord(data);
+                    if (!queryTests.isEmpty()) {
+                        logger.debug("Parsed test codes: " + queryTests);
+                    }
                     break;
                 case 'P': // Patient Record
                     logger.debug("Patient Record Received: " + data);
@@ -705,6 +719,16 @@ public class XL200Server {
             return null; // Not enough data within the field
         }
         return sampleDetails[1]; // This should be the sample ID
+    }
+
+    public static List<String> extractTestCodesFromQueryRecord(String astm2Message) {
+        List<String> codes = new ArrayList<>();
+        String[] fields = astm2Message.split("\\|");
+        if (fields.length > 3) {
+            String testField = fields[3];
+            codes = Arrays.stream(testField.split("\\^")).filter(s -> !s.isEmpty()).collect(Collectors.toList());
+        }
+        return codes;
     }
 
     public static String extractSampleIdFromOrderRecord(String astm2Message) {
