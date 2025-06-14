@@ -201,8 +201,8 @@ public class XL200Server {
     }
 
     private void handleAck(Socket clientSocket, OutputStream out) throws IOException {
-        System.out.println("handleAck = ");
-        System.out.println("needToSendHeaderRecordForQuery = " + needToSendHeaderRecordForQuery);
+        logger.debug("handleAck = ");
+        logger.debug("needToSendHeaderRecordForQuery = " + needToSendHeaderRecordForQuery);
         if (needToSendHeaderRecordForQuery) {
             logger.debug("Sending Header");
             String hm = createLimsHeaderRecord();
@@ -237,7 +237,7 @@ public class XL200Server {
             needToSendOrderingRecordForQuery = false;
             needToSendEotForRecordForQuery = true;
         } else if (needToSendEotForRecordForQuery) {
-            System.out.println("Creating an End record = ");
+            logger.debug("Creating an End record");
             String tmq = createLimsTerminationRecord(frameNumber, terminationCode);
             sendResponse(tmq, clientSocket);
             needToSendEotForRecordForQuery = false;
@@ -519,7 +519,7 @@ public class XL200Server {
                     }
                     break;
                 case 'Q': // Query Record
-                    System.out.println("Query result received" + data);
+                    logger.debug("Query result received" + data);
                     receivingQuery = false;
 
                     respondingQuery = true;
@@ -543,10 +543,10 @@ public class XL200Server {
 
                     break;
                 case 'O': // Order Record or other type represented by 'O'
-                    System.out.println("Order result received" + data);
+                    logger.debug("Order result received" + data);
                     logger.debug("Query Record Received: " + data);
                     String tmpSampleId = extractSampleIdFromOrderRecord(data);
-                    System.out.println("tmpSampleId = " + tmpSampleId);
+                    logger.debug("tmpSampleId = " + tmpSampleId);
                     sampleId = tmpSampleId;
                     QueryRecord qr = new QueryRecord(0, sampleId, sampleId, "");
                     getPatientDataBundle().getQueryRecords().add(qr);
@@ -634,7 +634,7 @@ public class XL200Server {
             logger.warn("Instrument name missing in result segment: {}", resultSegment);
         }
         logger.debug("Instrument name extracted: {}", instrumentName);
-        System.out.println("sampleId = " + sampleId);
+        logger.debug("sampleId = " + sampleId);
         // Return a new ResultsRecord object initialized with extracted values
         return new ResultsRecord(
                 frameNumber,
@@ -725,11 +725,11 @@ public class XL200Server {
     }
 
     public static QueryRecord parseQueryRecord(String querySegment) {
-        System.out.println("querySegment = " + querySegment);
+        logger.debug("querySegment = " + querySegment);
         String tmpSampleId = extractSampleIdFromQueryRecord(querySegment);
-        System.out.println("tmpSampleId = " + tmpSampleId);
+        logger.debug("tmpSampleId = " + tmpSampleId);
         sampleId = tmpSampleId;
-        System.out.println("Sample ID: " + tmpSampleId); // Debugging
+        logger.debug("Sample ID: " + tmpSampleId);
         return new QueryRecord(
                 0,
                 tmpSampleId,
