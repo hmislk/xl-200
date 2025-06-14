@@ -1,4 +1,4 @@
-package org.carecode.mw.lims.mw.indiko;
+package org.carecode.mw.lims.mw.xl200;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -6,7 +6,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 
-public class AnalyzerCommunicator {
+public class XL200AnalyzerCommunicator {
 
     private static final char ENQ = 0x05; // Enquiry
     private static final char ACK = 0x06; // Acknowledgement
@@ -15,7 +15,7 @@ public class AnalyzerCommunicator {
     private static final char ETX = 0x03; // End of Text
 
     public static void startServer() {
-        int middlewarePort = SettingsLoader.getSettings().getAnalyzerDetails().getAnalyzerPort();
+        int middlewarePort = XL200SettingsLoader.getSettings().getAnalyzerDetails().getAnalyzerPort();
 
         try (ServerSocket serverSocket = new ServerSocket(middlewarePort)) {
             System.out.println("Server started, listening on port: " + middlewarePort);
