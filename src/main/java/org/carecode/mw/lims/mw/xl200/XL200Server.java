@@ -278,6 +278,7 @@ public class XL200Server {
             logger.debug("Sent ENQ");
         } else if (respondingResults) {
             XL200LISCommunicator.pushResults(patientDataBundle);
+            respondingResults = false;
         } else {
             logger.debug("Received EOT, ending session");
         }
