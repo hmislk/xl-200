@@ -62,6 +62,11 @@ public class XL200Server {
     OrderRecord orderRecord;
     QueryRecord queryRecord;
 
+    // Session tracking fields for diagnostic logging
+    private long sessionStartMillis;
+    private List<String> sampleIdsInSession;
+    private int resultCount;
+
     private static ServerSocket serverSocket;
     private static int port; // Port needs to be static for restart
 
@@ -120,11 +125,17 @@ public class XL200Server {
     }
 
     private void handleClient(Socket clientSocket) {
-        try (InputStream in = new BufferedInputStream(clientSocket.getInputStream()); OutputStream out = new BufferedOutputStream(clientSocket.getOutputStream())) {
+        try (InputStream in = new BufferedInputStream(clientSocket.getInputStream());
+                OutputStream out = new BufferedOutputStream(clientSocket.getOutputStream())) {
             StringBuilder asciiDebugInfo = new StringBuilder();
             boolean sessionActive = true;
             boolean inChecksum = false;
             int checksumCount = 0;
+
+            // Initialize session tracking metrics
+            sessionStartMillis = System.currentTimeMillis();
+            sampleIdsInSession = new ArrayList<>();
+            resultCount = 0;
 
             while (sessionActive) {
                 int data = in.read();
@@ -194,6 +205,15 @@ public class XL200Server {
             }
         } catch (IOException e) {
             logger.error("Error during client communication", e);
+        } finally {
+            long sessionEndMillis = System.currentTimeMillis();
+            long durationSeconds = (sessionEndMillis - sessionStartMillis) / 1000;
+
+            logger.info("Session completed:");
+            logger.info("  Duration         : {} seconds", durationSeconds);
+            logger.info("  Result Records   : {}", resultCount);
+            logger.info("  Sample IDs       : {}", String.join(", ", sampleIdsInSession));
+            logger.info("  Client           : {}", clientSocket.getInetAddress().getHostAddress());
         }
     }
 
@@ -540,6 +560,13 @@ public class XL200Server {
                             logger.debug("Result Record Parsed: " + resultRecord);
                             logger.debug("Parsed sample ID: " + resultRecord.getSampleId()
                                     + ", Test code: " + resultRecord.getTestCode());
+
+                            // Track metrics for this session
+                            resultCount++;
+                            String sid = resultRecord.getSampleId();
+                            if (sid != null && !sid.isEmpty() && !sampleIdsInSession.contains(sid)) {
+                                sampleIdsInSession.add(sid);
+                            }
                         }
                     } catch (Exception ex) {
                         logger.error("Failed to parse result record: " + record, ex);
@@ -652,8 +679,9 @@ public class XL200Server {
         }
         logger.debug("Instrument name extracted: {}", instrumentName);
         logger.debug("sampleId = " + sampleId);
-        // Return a new ResultsRecord object initialized with extracted values
-        return new ResultsRecord(
+
+        // Build the ResultsRecord and ensure the sample ID field is populated
+        ResultsRecord rr = new ResultsRecord(
                 frameNumber,
                 testCode,
                 resultValueString,
@@ -662,6 +690,14 @@ public class XL200Server {
                 instrumentName,
                 sampleId
         );
+
+        try {
+            rr.getClass().getMethod("setSampleId", String.class).invoke(rr, sampleId);
+        } catch (Exception ignore) {
+            // If the library does not expose a setter, constructor value will be used
+        }
+
+        return rr;
 
     }
 
