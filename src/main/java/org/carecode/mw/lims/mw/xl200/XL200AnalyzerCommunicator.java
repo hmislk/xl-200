@@ -4,9 +4,13 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 
 public class XL200AnalyzerCommunicator {
+
+    private static final Logger logger = LogManager.getLogger(XL200AnalyzerCommunicator.class);
 
     private static final char ENQ = 0x05; // Enquiry
     private static final char ACK = 0x06; // Acknowledgement
@@ -18,13 +22,13 @@ public class XL200AnalyzerCommunicator {
         int middlewarePort = XL200SettingsLoader.getSettings().getAnalyzerDetails().getAnalyzerPort();
 
         try (ServerSocket serverSocket = new ServerSocket(middlewarePort)) {
-            System.out.println("Server started, listening on port: " + middlewarePort);
+            logger.info("Server started, listening on port: " + middlewarePort);
             while (true) {
                 Socket clientSocket = serverSocket.accept();
                 new Thread(new ClientHandler(clientSocket)).start();
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error starting server", e);
         }
     }
 
@@ -47,11 +51,11 @@ public class XL200AnalyzerCommunicator {
                         // Respond with ACK
                         out.write(ACK);
                         out.flush();
-                        System.out.println("Received ENQ, sent ACK");
+                        logger.debug("Received ENQ, sent ACK");
                     } else if (receivedChar == EOT) {
                         // End of transmission, process message but keep connection open
                         String message = messageBuffer.toString();
-                        System.out.println("Received message: " + message);
+                        logger.debug("Received message: " + message);
                         handleMessage(message, out);
                         messageBuffer.setLength(0); // Clear the buffer
                     } else {
@@ -59,15 +63,15 @@ public class XL200AnalyzerCommunicator {
                         messageBuffer.append(receivedChar);
                     }
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
-            } finally {
-                try {
-                    clientSocket.close();
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    logger.error("Error handling client", e);
+                } finally {
+                    try {
+                        clientSocket.close();
+                    } catch (Exception e) {
+                        logger.error("Error closing client socket", e);
+                    }
                 }
-            }
         }
     }
 
@@ -80,10 +84,10 @@ public class XL200AnalyzerCommunicator {
             // Send ACK after processing the message
             out.write(ACK);
             out.flush();
-            System.out.println("Sent ACK after processing message");
+            logger.debug("Sent ACK after processing message");
 
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error handling message", e);
         }
     }
 }
