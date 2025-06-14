@@ -97,6 +97,8 @@ public class XL200Server {
         DataBundle db = new DataBundle();
         db.setMiddlewareSettings(XL200SettingsLoader.getSettings());
 
+        String currentSampleId = null;
+
         for (String rec : records) {
             if (rec.startsWith("P|")) {
                 PatientRecord pr = XL200Parsers.parsePatientRecord(rec);
@@ -104,8 +106,10 @@ public class XL200Server {
             } else if (rec.startsWith("O|")) {
                 QueryRecord qr = XL200Parsers.parseQueryRecord(rec);
                 db.getQueryRecords().add(qr);
+                currentSampleId = qr.getSampleId();
             } else if (rec.startsWith("R|")) {
                 ResultsRecord rr = XL200Parsers.parseResultsRecord(rec);
+                rr.setSampleId(currentSampleId);
                 db.getResultsRecords().add(rr);
             }
         }
