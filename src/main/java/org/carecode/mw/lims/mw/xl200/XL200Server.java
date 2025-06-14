@@ -64,18 +64,12 @@ public class XL200Server {
 
     private static ServerSocket serverSocket;
     private static int port; // Port needs to be static for restart
-    
-    int maxUnexpectedDataLimit=1000;
-    int unexpectedDataCount=0;
 
-    
-    
-    
-    
-    
-    
-   public void start(int port) {
-       port = XL200SettingsLoader.getSettings().getAnalyzerDetails().getAnalyzerPort();
+    int maxUnexpectedDataLimit = 1000;
+    int unexpectedDataCount = 0;
+
+    public void start(int port) {
+        port = XL200SettingsLoader.getSettings().getAnalyzerDetails().getAnalyzerPort();
 //        XL200Server.port = port;  // Assign port to static variable for restart
         try {
             serverSocket = new ServerSocket(port);
@@ -182,20 +176,20 @@ public class XL200Server {
                         handleEot(out);
                         break;
                     default:
-                       if (data == -1) {
-                        unexpectedDataCount++;
-                        logger.debug("Received unexpected data: " + (char) data + " (ASCII: " + data + ")");
-                        if (unexpectedDataCount >= maxUnexpectedDataLimit) {
-                            logger.error("Too many unexpected data received, closing connection and restarting the server.");
-                            sessionActive = false;
-                            clientSocket.close();
-                            restartServer();
-                            return;
+                        if (data == -1) {
+                            unexpectedDataCount++;
+                            logger.debug("Received unexpected data: " + (char) data + " (ASCII: " + data + ")");
+                            if (unexpectedDataCount >= maxUnexpectedDataLimit) {
+                                logger.error("Too many unexpected data received, closing connection and restarting the server.");
+                                sessionActive = false;
+                                clientSocket.close();
+                                restartServer();
+                                return;
+                            }
+                        } else {
+                            unexpectedDataCount = 0;  // Reset count on valid data
                         }
-                    } else {
-                        unexpectedDataCount = 0;  // Reset count on valid data
-                    }
-                    break;
+                        break;
                 }
             }
         } catch (IOException e) {
@@ -491,9 +485,19 @@ public class XL200Server {
     }
 
     private void processMessage(String data, Socket clientSocket) {
+        // Normalize line endings (CR or CRLF → LF) and remove duplicates
+        data = data.replace("\r", "\n").replaceAll("\n+", "\n");
+        String[] records = data.split("\n");
 
-        if (data.length() >= 3 && Character.isDigit(data.charAt(0)) && data.charAt(2) == '|') {
-            char recordType = data.charAt(1);
+        logger.debug("Splitting into ASTM records:");
+        for (String record : records) {
+            logger.debug("Record: " + record);
+
+            if (record.length() < 2 || record.charAt(1) != '|') {
+                logger.debug("Invalid Record Structure: " + record);
+                continue;
+            }
+            char recordType = record.charAt(0); // First character is the record type: H, P, O, R, etc.
 
             switch (recordType) {
                 case 'H': // Header Record
@@ -506,14 +510,31 @@ public class XL200Server {
                     needToSendOrderingRecordForQuery = false;
                     needToSendPatientRecordForQuery = false;
                     needToSendHeaderRecordForQuery = false;
-                    logger.debug("Header Record Received: " + data);
+                    logger.debug("Header Record Received: " + record);
                     break;
+
+                case 'P': // Patient Record
+                    logger.debug("Patient Record Received: " + record);
+                    patientRecord = parsePatientRecord(record);
+                    getPatientDataBundle().setPatientRecord(patientRecord);
+                    logger.debug("Patient Record Parsed: " + patientRecord);
+                    break;
+
+                case 'O': // Order Record
+                    logger.debug("Order Record Received: " + record);
+                    String tmpSampleId = extractSampleIdFromOrderRecord(record);
+                    logger.debug("tmpSampleId = " + tmpSampleId);
+                    sampleId = tmpSampleId;
+                    queryRecord = new QueryRecord(0, sampleId, sampleId, "");
+                    getPatientDataBundle().getQueryRecords().add(queryRecord);
+                    logger.debug("Parsed the Query Record: " + queryRecord);
+                    break;
+
                 case 'R': // Result Record
-                    logger.debug("Result Record Received: " + data);
-                    respondingResults = true;
-                    respondingQuery = false;
+                    logger.debug("Result Record Received: " + record);
+                    respondingResults = true; // 🔴 Important fix here
                     try {
-                        resultRecord = parseResultsRecord(data);
+                        resultRecord = parseResultsRecord(record);
                         if (resultRecord != null) {
                             getPatientDataBundle().getResultsRecords().add(resultRecord);
                             logger.debug("Result Record Parsed: " + resultRecord);
@@ -521,66 +542,47 @@ public class XL200Server {
                                     + ", Test code: " + resultRecord.getTestCode());
                         }
                     } catch (Exception ex) {
-                        logger.error("Failed to parse result record: " + data, ex);
+                        logger.error("Failed to parse result record: " + record, ex);
                     }
                     break;
-                case 'Q': // Query Record
-                    logger.debug("Query result received" + data);
-                    receivingQuery = false;
 
+                case 'Q': // Query Record
+                    logger.debug("Query Record Received: " + record);
+                    receivingQuery = false;
                     respondingQuery = true;
                     needToSendHeaderRecordForQuery = true;
-                    logger.debug("Query Record Received: " + data);
-                    queryRecord = parseQueryRecord(data);
+                    queryRecord = parseQueryRecord(record);
                     getPatientDataBundle().getQueryRecords().add(queryRecord);
                     logger.debug("Parsed the Query Record: " + queryRecord);
-                    try {
-                        logger.debug("Parsed sample ID: " + queryRecord.getSampleId());
-                    } catch (Exception e) {
-                        logger.debug("Could not log parsed sample ID", e);
-                    }
-                    List<String> queryTests = extractTestCodesFromQueryRecord(data);
+                    List<String> queryTests = extractTestCodesFromQueryRecord(record);
                     if (!queryTests.isEmpty()) {
                         logger.debug("Parsed test codes: " + queryTests);
                     }
                     break;
-                case 'P': // Patient Record
-                    logger.debug("Patient Record Received: " + data);
-                    patientRecord = parsePatientRecord(data);
-                    getPatientDataBundle().setPatientRecord(patientRecord);
-                    logger.debug("Patient Record Parsed: " + patientRecord);
-                    break;
-                case 'L': // Termination Record
-                    logger.debug("Termination Record Received: " + data);
-                    break;
-                case 'C': // Comment Record
-                    logger.debug("Comment Record Received: " + data);
 
+                case 'C': // Comment Record
+                    logger.debug("Comment Record Received: " + record);
                     break;
-                case 'O': // Order Record or other type represented by 'O'
-                    logger.debug("Order result received" + data);
-                    logger.debug("Query Record Received: " + data);
-                    String tmpSampleId = extractSampleIdFromOrderRecord(data);
-                    logger.debug("tmpSampleId = " + tmpSampleId);
-                    sampleId = tmpSampleId;
-                    QueryRecord qr = new QueryRecord(0, sampleId, sampleId, "");
-                    getPatientDataBundle().getQueryRecords().add(qr);
-//                    OrderRecord orderRecord = new OrderRecord(2, sampleId, null, sampleId, "", "");
-//                    getPatientDataBundle().getOrderRecords().add(orderRecord);
-                    logger.debug("Parsed the Query Record: " + queryRecord);
+
+                case 'L': // Termination Record
+                    logger.debug("Termination Record Received: " + record);
                     break;
-                default: // Unknown Record
-                    logger.debug("Unknown Record Received: " + data);
+
+                default:
+                    logger.debug("Unknown Record Received: " + record);
                     break;
             }
-        } else {
-            logger.debug("Invalid Record Structure: " + data);
         }
     }
 
     public static PatientRecord parsePatientRecord(String patientSegment) {
         String[] fields = patientSegment.split("\\|");
-        int frameNumber = Integer.parseInt(fields[0].replaceAll("[^0-9]", ""));
+        int frameNumber = 1;
+        try {
+            frameNumber = Integer.parseInt(fields[0].replaceAll("[^0-9]", ""));
+        } catch (NumberFormatException e) {
+            logger.warn("Could not extract frame number from field: '{}', defaulting to 1", fields[0]);
+        }
         String patientId = fields[1];
         String additionalId = fields[3]; // assuming index 2 is always empty as per your example
         String patientName = fields[4];
