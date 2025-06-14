@@ -508,9 +508,15 @@ public class XL200Server {
                     logger.debug("Result Record Received: " + data);
                     respondingResults = true;
                     respondingQuery = false;
-                    resultRecord = parseResultsRecord(data);
-                    getPatientDataBundle().getResultsRecords().add(resultRecord);
-                    logger.debug("Result Record Parsed: " + resultRecord);
+                    try {
+                        resultRecord = parseResultsRecord(data);
+                        if (resultRecord != null) {
+                            getPatientDataBundle().getResultsRecords().add(resultRecord);
+                            logger.debug("Result Record Parsed: " + resultRecord);
+                        }
+                    } catch (Exception ex) {
+                        logger.error("Failed to parse result record: " + data, ex);
+                    }
                     break;
                 case 'Q': // Query Record
                     System.out.println("Query result received" + data);
@@ -619,9 +625,14 @@ public class XL200Server {
         // Units and other details
         String resultUnits = fields[4];
         logger.debug("Result units extracted: {}", resultUnits);
-        String resultDateTime = fields[12];
+        String resultDateTime = fields.length > 12 ? fields[12] : "";
         logger.debug("Result date-time extracted: {}", resultDateTime);
-        String instrumentName = fields[13];
+        String instrumentName = "";
+        if (fields.length > 13) {
+            instrumentName = fields[13];
+        } else {
+            logger.warn("Instrument name missing in result segment: {}", resultSegment);
+        }
         logger.debug("Instrument name extracted: {}", instrumentName);
         System.out.println("sampleId = " + sampleId);
         // Return a new ResultsRecord object initialized with extracted values
