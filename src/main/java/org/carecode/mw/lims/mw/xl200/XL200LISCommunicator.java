@@ -16,15 +16,18 @@ import java.util.List;
 import org.carecode.lims.libraries.DataBundle;
 import org.carecode.lims.libraries.QueryRecord;
 import org.carecode.lims.libraries.ResultsRecord;
-import static org.carecode.mw.lims.mw.xl200.XL200.logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class XL200LISCommunicator {
+
+    private static final Logger logger = LogManager.getLogger(XL200LISCommunicator.class);
 
 //    static boolean testing = true;
     private static final Gson gson = new Gson();
 
     public static DataBundle pullTestOrdersForSampleRequests(QueryRecord queryRecord) {
-        System.out.println("pullTestOrdersForSampleRequests");
+        logger.info("pullTestOrdersForSampleRequests");
 //        if (testing) {
 //            PatientDataBundle pdb = new PatientDataBundle();
 //            List<String> testNames = Arrays.asList("HDL", "RF2");
@@ -37,22 +40,22 @@ public class XL200LISCommunicator {
 
         try {
             String postSampleDataEndpoint = XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl();
-            System.out.println("postSampleDataEndpoint = " + postSampleDataEndpoint);
+            logger.debug("postSampleDataEndpoint = " + postSampleDataEndpoint);
             URL url = new URL(postSampleDataEndpoint + "/test_orders_for_sample_requests");
-            System.out.println("url = " + url);
+            logger.debug("url = " + url);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Accept", "application/json");
             conn.setDoOutput(true);
-            System.out.println("queryRecord = " + queryRecord);
+            logger.debug("queryRecord = " + queryRecord);
             // Convert QueryRecord to JSON
 
             DataBundle databundle = new DataBundle();
             databundle.setMiddlewareSettings(XL200SettingsLoader.getSettings());
             databundle.getQueryRecords().add(queryRecord);
             String jsonInputString = gson.toJson(databundle);
-            System.out.println("jsonInputString = " + jsonInputString);
+            logger.debug("jsonInputString = " + jsonInputString);
             // Send the request
             try (OutputStream os = conn.getOutputStream()) {
                 byte[] input = jsonInputString.getBytes("utf-8");
@@ -60,9 +63,9 @@ public class XL200LISCommunicator {
             }
 
             int responseCode = conn.getResponseCode();
-            System.out.println("responseCode = " + responseCode);
+            logger.info("responseCode = " + responseCode);
             if (responseCode == HttpURLConnection.HTTP_OK) {
-                System.out.println("OK responseCode = " + responseCode);
+                logger.info("OK responseCode = " + responseCode);
                 // Process response
                 BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
                 StringBuilder response = new StringBuilder();
@@ -72,38 +75,38 @@ public class XL200LISCommunicator {
                     response.append(inputLine);
                 }
                 in.close();
-                System.out.println("response.toString() = " + response.toString());
+                logger.debug("response.toString() = " + response.toString());
                 // Convert the response to a PatientDataBundle object
                 DataBundle patientDataBundle = gson.fromJson(response.toString(), DataBundle.class);
-                System.out.println("patientDataBundle = " + patientDataBundle);
+                logger.debug("patientDataBundle = " + patientDataBundle);
                 return patientDataBundle;
             } else {
-                System.out.println("POST request failed. Response code: " + responseCode);
+                logger.error("POST request failed. Response code: " + responseCode);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error pulling test orders", e);
         }
 
         return null;
     }
 
     public static void pushResults(DataBundle patientDataBundle) {
-        System.out.println("pushResults = ");
+        logger.info("pushResults = ");
         try {
-            System.out.println("XL200SettingsLoader.getSettings() = " + XL200SettingsLoader.getSettings());
-            System.out.println("XL200SettingsLoader.getSettings().getLimsSettings() = " + XL200SettingsLoader.getSettings().getLimsSettings());
-            System.out.println("XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl() = " + XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl());
+            logger.debug("XL200SettingsLoader.getSettings() = " + XL200SettingsLoader.getSettings());
+            logger.debug("XL200SettingsLoader.getSettings().getLimsSettings() = " + XL200SettingsLoader.getSettings().getLimsSettings());
+            logger.debug("XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl() = " + XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl());
             String pushResultsEndpoint = XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl() + "/test_results";
 
             
             for(ResultsRecord rr:patientDataBundle.getResultsRecords()){
-                System.out.println("rr value  = " + rr.getResultValue() + "");
-                System.out.println("rr value string = " + rr.getResultValueString());
+                logger.debug("rr value  = " + rr.getResultValue() + "");
+                logger.debug("rr value string = " + rr.getResultValueString());
             }
             
             
             URL url = new URL(pushResultsEndpoint);
-            System.out.println("url = " + url);
+            logger.debug("url = " + url);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
@@ -112,7 +115,7 @@ public class XL200LISCommunicator {
             // Serialize PatientDataBundle to JSON
             patientDataBundle.setMiddlewareSettings(XL200SettingsLoader.getSettings());
             String jsonInputString = gson.toJson(patientDataBundle);
-            System.out.println("jsonInputString = " + jsonInputString);
+            logger.debug("jsonInputString = " + jsonInputString);
             // Send the JSON in the request body
             try (OutputStream os = conn.getOutputStream()) {
                 byte[] input = jsonInputString.getBytes("utf-8");
@@ -120,9 +123,9 @@ public class XL200LISCommunicator {
             }
 
             int responseCode = conn.getResponseCode();
-            System.out.println("responseCode = " + responseCode);
+            logger.info("responseCode = " + responseCode);
             if (responseCode == HttpURLConnection.HTTP_OK) {
-                System.out.println("ok");
+                logger.info("ok");
                 BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
                 StringBuilder response = new StringBuilder();
                 String inputLine;
@@ -132,7 +135,7 @@ public class XL200LISCommunicator {
                 }
                 in.close();
 
-                System.out.println("response.toString() = " + response.toString());
+                logger.debug("response.toString() = " + response.toString());
 
                 // Optionally process the server response (if needed)
                 JsonObject responseObject = JsonParser.parseString(response.toString()).getAsJsonObject();
@@ -161,10 +164,10 @@ public class XL200LISCommunicator {
                 }
 
             } else {
-                System.out.println("POST request failed. Response code: " + responseCode);
+                logger.error("POST request failed. Response code: " + responseCode);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error pushing results", e);
         }
     }
 

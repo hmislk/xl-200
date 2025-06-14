@@ -20,8 +20,8 @@ public class XL200SettingsLoader {
             // Read and print the contents of the config.json file
             String filePath = "D:\\ccmw\\settings\\xl200\\config.json";
             String jsonContent = new String(Files.readAllBytes(Paths.get(filePath)));
-            System.out.println("Contents of config.json:");
-            System.out.println(jsonContent);
+            logger.debug("Contents of config.json:");
+            logger.debug(jsonContent);
 
             // Now parse the JSON content
             try (FileReader reader = new FileReader(filePath)) {
@@ -29,24 +29,24 @@ public class XL200SettingsLoader {
                 logger.info("Settings loaded from config.json");
 
                 // Debugging output
-                System.out.println("MiddlewareSettings loaded:");
-                System.out.println(middlewareSettings);
+                logger.debug("MiddlewareSettings loaded:");
+                logger.debug(middlewareSettings);
 
                 if (middlewareSettings.getAnalyzerDetails() != null) {
-                    System.out.println("Analyzer Name: " + middlewareSettings.getAnalyzerDetails().getAnalyzerName());
+                    logger.debug("Analyzer Name: " + middlewareSettings.getAnalyzerDetails().getAnalyzerName());
                 } else {
-                    System.out.println("AnalyzerDetails is null");
+                    logger.debug("AnalyzerDetails is null");
                 }
 
                 if (middlewareSettings.getLimsSettings() != null) {
-                    System.out.println("LIMS Server Base URL: " + middlewareSettings.getLimsSettings().getLimsServerBaseUrl());
+                    logger.debug("LIMS Server Base URL: " + middlewareSettings.getLimsSettings().getLimsServerBaseUrl());
                 } else {
-                    System.out.println("LimsSettings is null");
+                    logger.debug("LimsSettings is null");
                 }
             }
         } catch (IOException e) {
             logger.error("Failed to load settings from config.json", e);
-            System.out.println("Failed to load settings: " + e.getMessage());
+            logger.error("Failed to load settings: " + e.getMessage());
         }
     }
 
