@@ -32,7 +32,7 @@ public class XL200LISCommunicator {
     private static final boolean IGNORE_LIMS_RESPONSE = Boolean.parseBoolean(
         System.getProperty(
             "ignoreLimsResponse",
-            System.getenv().getOrDefault("IGNORE_LIMS_RESPONSE", "false")
+            System.getenv().getOrDefault("IGNORE_LIMS_RESPONSE", "true")
         )
     );
 
