@@ -20,3 +20,23 @@ or by setting the environment variable before starting the application:
 export IGNORE_LIMS_RESPONSE=true
 java -jar xl200.jar
 ```
+
+## Custom Configuration Location
+
+By default the middleware loads its settings from
+`C:\CCMW\SysmaxXS500i\settings\XL200\config.json`. To use a different file,
+provide the path via the `xl200.config.path` system property or the
+`XL200_CONFIG_PATH` environment variable.
+
+Example using the system property:
+
+```bash
+java -Dxl200.config.path=/path/to/config.json -jar xl200.jar
+```
+
+Or set the environment variable:
+
+```bash
+export XL200_CONFIG_PATH=/path/to/config.json
+java -jar xl200.jar
+```

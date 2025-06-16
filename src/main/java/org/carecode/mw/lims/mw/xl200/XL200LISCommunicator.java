@@ -6,6 +6,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -102,41 +103,57 @@ public class XL200LISCommunicator {
             }
 
             int responseCode = conn.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK || IGNORE_LIMS_RESPONSE) {
-                BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
-                StringBuilder response = new StringBuilder();
-                String inputLine;
+            boolean success = responseCode == HttpURLConnection.HTTP_OK;
+            InputStream responseStream = success ? conn.getInputStream() : conn.getErrorStream();
 
-                while ((inputLine = in.readLine()) != null) {
-                    response.append(inputLine);
+            String responseBody = null;
+            if (responseStream != null) {
+                try (BufferedReader in = new BufferedReader(new InputStreamReader(responseStream, "utf-8"))) {
+                    StringBuilder response = new StringBuilder();
+                    String inputLine;
+                    while ((inputLine = in.readLine()) != null) {
+                        response.append(inputLine);
+                    }
+                    responseBody = response.toString();
                 }
-                in.close();
+            }
 
-                JsonObject responseObject = JsonParser.parseString(response.toString()).getAsJsonObject();
-                logger.info("Response from server: {}", responseObject);
+            if (success) {
+                if (responseBody != null && !responseBody.isEmpty()) {
+                    JsonObject responseObject = JsonParser.parseString(responseBody).getAsJsonObject();
+                    logger.info("Response from server: {}", responseObject);
 
-                String status = responseObject.get("status").getAsString();
-                logger.info("Status: {}", status);
+                    String status = responseObject.get("status").getAsString();
+                    logger.info("Status: {}", status);
 
-                JsonArray detailsArray = responseObject.getAsJsonArray("details");
-                List<ResultsRecord> resultsRecords = new ArrayList<>();
-                for (JsonElement element : detailsArray) {
-                    ResultsRecord record = gson.fromJson(element, ResultsRecord.class);
-                    resultsRecords.add(record);
-                }
+                    JsonArray detailsArray = responseObject.getAsJsonArray("details");
+                    List<ResultsRecord> resultsRecords = new ArrayList<>();
+                    for (JsonElement element : detailsArray) {
+                        ResultsRecord record = gson.fromJson(element, ResultsRecord.class);
+                        resultsRecords.add(record);
+                    }
 
-                for (ResultsRecord record : resultsRecords) {
-                    logger.info("Sample ID: {}, Test: {}, Status: {}",
-                        record.getSampleId(), record.getTestCode(), record.getStatus());
-                }
-                if (responseCode != HttpURLConnection.HTTP_OK) {
-                    logger.warn("POST request failed with {} but IGNORE_LIMS_RESPONSE is active", responseCode);
+                    for (ResultsRecord record : resultsRecords) {
+                        logger.info("Sample ID: {}, Test: {}, Status: {}",
+                            record.getSampleId(), record.getTestCode(), record.getStatus());
+                    }
                 }
                 return true;
-            } else {
-                logger.error("POST request failed. Response code: {}", responseCode);
-                return false;
             }
+
+            if (IGNORE_LIMS_RESPONSE) {
+                logger.warn("POST request failed with {} but IGNORE_LIMS_RESPONSE is active", responseCode);
+                if (responseBody != null && !responseBody.isEmpty()) {
+                    logger.warn("LIMS response body: {}", responseBody);
+                }
+                return true;
+            }
+
+            logger.error("POST request failed. Response code: {}", responseCode);
+            if (responseBody != null && !responseBody.isEmpty()) {
+                logger.error("LIMS response body: {}", responseBody);
+            }
+            return false;
         } catch (Exception e) {
             if (IGNORE_LIMS_RESPONSE) {
                 logger.warn("Exception in pushResults but IGNORE_LIMS_RESPONSE is active", e);

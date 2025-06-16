@@ -13,12 +13,16 @@ public class XL200SettingsLoader {
 
     private static final Logger logger = LogManager.getLogger(XL200SettingsLoader.class);
     private static MiddlewareSettings middlewareSettings;
+    private static final String DEFAULT_CONFIG_PATH =
+        "C\\CCMW\\SysmaxXS500i\\settings\\XL200\\config.json";
 
     public static void loadSettings() {
         Gson gson = new Gson();
+        String filePath = System.getProperty(
+            "xl200.config.path",
+            System.getenv().getOrDefault("XL200_CONFIG_PATH", DEFAULT_CONFIG_PATH)
+        );
         try {
-            // Read and print the contents of the config.json file
-            String filePath = "C:\\CCMW\\SysmaxXS500i\\settings\\XL200\\config.json";
             String jsonContent = new String(Files.readAllBytes(Paths.get(filePath)));
             logger.debug("Contents of config.json:");
             logger.debug(jsonContent);
@@ -26,7 +30,7 @@ public class XL200SettingsLoader {
             // Now parse the JSON content
             try (FileReader reader = new FileReader(filePath)) {
                 middlewareSettings = gson.fromJson(reader, MiddlewareSettings.class);
-                logger.info("Settings loaded from config.json");
+                logger.info("Settings loaded from " + filePath);
 
                 // Debugging output
                 logger.debug("MiddlewareSettings loaded:");
@@ -45,7 +49,7 @@ public class XL200SettingsLoader {
                 }
             }
         } catch (IOException e) {
-            logger.error("Failed to load settings from config.json", e);
+            logger.error("Failed to load settings from " + filePath, e);
             logger.error("Failed to load settings: " + e.getMessage());
         }
     }
