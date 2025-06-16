@@ -68,8 +68,21 @@ public class XL200Server {
                     out.write(ACK);
                     out.flush();
                 } else if (b == EOT) {
-                    logger.debug("Received EOT. Session complete.");
-                    break;
+                    logger.debug("Received EOT.");
+                    if (frame.length() > 0) {
+                        String message = frame.toString();
+                        logger.debug("Received ASTM Frame: {}", message);
+                        List<String> records = splitRecords(message);
+                        DataBundle db = processRecords(records);
+                        resultCount = db.getResultsRecords().size();
+                        if (db.getPatientRecord() != null) {
+                            sampleIds.add(db.getPatientRecord().getPatientId());
+                        }
+                        out.write(ACK);
+                        out.flush();
+                    }
+                    frame.setLength(0);
+                    // continue waiting for next transmission
                 } else {
                     frame.append((char) b);
                 }
