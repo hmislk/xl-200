@@ -115,7 +115,10 @@ public class XL200Server {
         }
 
         if (!db.getResultsRecords().isEmpty()) {
-            XL200LISCommunicator.pushResults(db);
+            boolean success = XL200LISCommunicator.pushResults(db);
+            if (!success && !XL200LISCommunicator.isIgnoreLimsResponse()) {
+                logger.warn("Failed to push results to LIMS");
+            }
         }
         return db;
     }
