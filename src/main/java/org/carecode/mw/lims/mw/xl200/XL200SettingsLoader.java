@@ -14,7 +14,7 @@ public class XL200SettingsLoader {
     private static final Logger logger = LogManager.getLogger(XL200SettingsLoader.class);
     private static MiddlewareSettings middlewareSettings;
     private static final String DEFAULT_CONFIG_PATH =
-        "C\\CCMW\\SysmaxXS500i\\settings\\XL200\\config.json";
+        "C:\\CCMW\\SysmaxXS500i\\settings\\XL200\\config.json";
 
     public static void loadSettings() {
         Gson gson = new Gson();
