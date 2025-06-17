@@ -21,7 +21,30 @@ public class XL200Parsers {
     public static QueryRecord parseQueryRecord(String record) {
         String[] fields = record.split("\\|");
         String sampleId = fields.length > 2 ? fields[2].split("\\^")[0] : "";
-        return new QueryRecord(0, sampleId, "", "");
+
+        // ASTM query records may optionally specify one or more test codes in
+        // the universal test ID field (typically field index 4). These are
+        // separated by backslashes when multiple tests are requested. Extract
+        // them so they can be forwarded to the LIMS if present.
+        String testCodes = "";
+        if (fields.length > 4 && !fields[4].isEmpty()) {
+            String[] tests = fields[4].split("\\\\");
+            StringBuilder parsed = new StringBuilder();
+            for (int i = 0; i < tests.length; i++) {
+                String[] parts = tests[i].split("\\^");
+                String code = parts.length > 3 ? parts[3]
+                        : parts[parts.length - 1];
+                if (!code.isEmpty()) {
+                    if (parsed.length() > 0) {
+                        parsed.append(',');
+                    }
+                    parsed.append(code);
+                }
+            }
+            testCodes = parsed.toString();
+        }
+
+        return new QueryRecord(0, sampleId, sampleId, testCodes);
     }
 
     public static ResultsRecord parseResultsRecord(String record) {

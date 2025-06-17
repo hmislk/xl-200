@@ -40,3 +40,10 @@ Or set the environment variable:
 export XL200_CONFIG_PATH=/path/to/config.json
 java -jar xl200.jar
 ```
+
+## Query Record Handling
+
+When the analyzer sends a query record the middleware now forwards the sample ID
+to the LIMS using the `/test_orders_for_sample_requests` endpoint. Any test
+codes present in the query are extracted and forwarded so multiple requested
+tests are handled correctly.
