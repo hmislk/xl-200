@@ -67,6 +67,15 @@ public class XL200Server {
                     }
                     out.write(ACK);
                     out.flush();
+
+                    // Discard checksum (2 bytes) and trailing CR/LF after ETX
+                    for (int i = 0; i < 4; i++) {
+                        if (in.read() == -1) {
+                            break;
+                        }
+                    }
+                    // Reset for next transmission
+                    frame.setLength(0);
                 } else if (b == EOT) {
                     logger.debug("Received EOT.");
                     if (frame.length() > 0) {
