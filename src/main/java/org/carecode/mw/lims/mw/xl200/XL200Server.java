@@ -116,7 +116,7 @@ public class XL200Server {
             if (rec.startsWith("P|")) {
                 PatientRecord pr = XL200Parsers.parsePatientRecord(rec);
                 db.setPatientRecord(pr);
-            } else if (rec.startsWith("O|")) {
+            } else if (rec.startsWith("Q|")) {
                 QueryRecord qr = XL200Parsers.parseQueryRecord(rec);
                 db.getQueryRecords().add(qr);
                 currentSampleId = qr.getSampleId();
