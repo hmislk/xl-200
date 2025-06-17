@@ -121,6 +121,9 @@ public class XL200Server {
                 db.getQueryRecords().add(qr);
                 currentSampleId = qr.getSampleId();
                 logger.debug("Query for sample ID: {}", currentSampleId);
+                String endpoint = XL200SettingsLoader.getSettings().getLimsSettings()
+                    .getLimsServerBaseUrl() + "/test_orders_for_sample_requests";
+                logger.debug("Pulling test orders for sample {} from {}", currentSampleId, endpoint);
                 // Forward query record to the LIMS to fetch any pending test orders
                 XL200LISCommunicator.pullTestOrdersForSampleRequests(qr);
             } else if (rec.startsWith("R|")) {
