@@ -118,14 +118,17 @@ public class XL200Server {
                 PatientRecord pr = XL200Parsers.parsePatientRecord(rec);
                 db.setPatientRecord(pr);
             } else if (rec.startsWith("Q|")) {
+                // ASTM query record from the analyser
                 QueryRecord qr = XL200Parsers.parseQueryRecord(rec);
                 db.getQueryRecords().add(qr);
                 currentSampleId = qr.getSampleId();
                 // Forward query record to the LIMS to fetch any pending test orders
                 XL200LISCommunicator.pullTestOrdersForSampleRequests(qr);
             } else if (rec.startsWith("O|")) {
+                // Order records may accompany results or be returned from the LIMS
                 OrderRecord or = XL200Parsers.parseOrderRecord(rec);
                 db.getOrderRecords().add(or);
+                currentSampleId = or.getSampleId();
             } else if (rec.startsWith("R|")) {
                 ResultsRecord rr = XL200Parsers.parseResultsRecord(rec);
                 rr.setSampleId(currentSampleId);
