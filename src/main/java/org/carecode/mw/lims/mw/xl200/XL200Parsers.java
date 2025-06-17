@@ -62,7 +62,6 @@ public class XL200Parsers {
         String testCode = fields.length > 2 ? fields[2].split("\\^").length > 3 ? fields[2].split("\\^")[3] : fields[2] : "";
         String resultValue = fields.length > 3 ? fields[3] : "";
         String unit = fields.length > 4 ? fields[4] : "";
-        String refRange = fields.length > 5 ? fields[5] : "";
         String resultDateTime = fields.length > 12 ? fields[12] : "";
 
         return new ResultsRecord(1, testCode, resultValue, unit, resultDateTime, "XL_200", "");
