@@ -20,7 +20,8 @@ public class XL200Parsers {
 
     public static QueryRecord parseQueryRecord(String record) {
         String[] fields = record.split("\\|");
-        String sampleId = fields.length > 2 ? fields[2].split("\\^")[0] : "";
+        String[] parts = fields.length > 2 ? fields[2].split("\\^") : new String[0];
+        String sampleId = parts.length > 1 ? parts[1] : parts[0];
         return new QueryRecord(0, sampleId, "", "");
     }
 
