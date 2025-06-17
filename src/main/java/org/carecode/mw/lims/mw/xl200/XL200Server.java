@@ -31,6 +31,7 @@ public class XL200Server {
 
             while (true) {
                 Socket clientSocket = serverSocket.accept();
+                logger.info("Accepted connection from {}:{}", clientSocket.getInetAddress().getHostAddress(), clientSocket.getPort());
                 new Thread(() -> handleClient(clientSocket)).start();
             }
 
