@@ -4,6 +4,10 @@ import org.carecode.lims.libraries.PatientRecord;
 import org.carecode.lims.libraries.QueryRecord;
 import org.carecode.lims.libraries.ResultsRecord;
 import org.carecode.lims.libraries.OrderRecord;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 
 public class XL200Parsers {
 
@@ -107,6 +111,17 @@ public class XL200Parsers {
         // Priority (field 5) if present.
         String priority = fields.length > 5 ? fields[5] : "";
 
-        return new OrderRecord(1, sampleId, sampleId, testCode, priority);
+        // Build list of requested tests using the extracted code.
+        List<String> tests = new ArrayList<>();
+        if (!testCode.isEmpty()) {
+            tests.add(testCode);
+        }
+
+        // Current date/time in ASTM format.
+        String orderDateTimeStr = LocalDateTime.now()
+                .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+
+        return new OrderRecord(1, sampleId, tests, sampleId,
+                orderDateTimeStr, priority);
     }
 }
