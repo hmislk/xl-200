@@ -20,7 +20,16 @@ public class XL200Parsers {
 
     public static QueryRecord parseQueryRecord(String record) {
         String[] fields = record.split("\\|");
-        String sampleId = fields.length > 2 ? fields[2].split("\\^")[0] : "";
+        String sampleId = "";
+        if (fields.length > 2) {
+            String[] parts = fields[2].split("\\^");
+            for (String part : parts) {
+                if (!part.isEmpty()) {
+                    sampleId = part;
+                    break;
+                }
+            }
+        }
 
         // ASTM query records may optionally specify one or more test codes in
         // the universal test ID field (typically field index 4). These are
