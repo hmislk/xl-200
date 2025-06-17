@@ -3,6 +3,7 @@ package org.carecode.mw.lims.mw.xl200;
 import org.carecode.lims.libraries.PatientRecord;
 import org.carecode.lims.libraries.QueryRecord;
 import org.carecode.lims.libraries.ResultsRecord;
+import org.carecode.lims.libraries.OrderRecord;
 
 public class XL200Parsers {
 
@@ -65,5 +66,48 @@ public class XL200Parsers {
         String resultDateTime = fields.length > 12 ? fields[12] : "";
 
         return new ResultsRecord(1, testCode, resultValue, unit, resultDateTime, "XL_200", "");
+    }
+
+    /**
+     * Parse an ASTM order record.
+     *
+     * <p>The XL-200 instrument follows the common ASTM structure where the
+     * sample id is provided in field 2 and the universal test identifier in
+     * field 4.  The universal test identifier may contain multiple components
+     * separated by carets.  The actual test code is usually found at position
+     * 4 within that field, falling back to the last non empty component when
+     * fewer parts are present.</p>
+     */
+    public static OrderRecord parseOrderRecord(String record) {
+        String[] fields = record.split("\\|");
+
+        // Sample identifier (field 2) may contain empty components separated by
+        // carets.  Use the first non empty part just like query records do.
+        String sampleId = "";
+        if (fields.length > 2) {
+            String[] parts = fields[2].split("\\^");
+            for (String part : parts) {
+                if (!part.isEmpty()) {
+                    sampleId = part;
+                    break;
+                }
+            }
+        }
+
+        // Extract the requested test code from the universal test ID (field 4).
+        String testCode = "";
+        if (fields.length > 4 && !fields[4].isEmpty()) {
+            String[] parts = fields[4].split("\\^");
+            if (parts.length > 3 && !parts[3].isEmpty()) {
+                testCode = parts[3];
+            } else if (parts.length > 0) {
+                testCode = parts[parts.length - 1];
+            }
+        }
+
+        // Priority (field 5) if present.
+        String priority = fields.length > 5 ? fields[5] : "";
+
+        return new OrderRecord(1, sampleId, sampleId, testCode, priority);
     }
 }
