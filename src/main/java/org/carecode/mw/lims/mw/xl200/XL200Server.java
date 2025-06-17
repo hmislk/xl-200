@@ -46,6 +46,7 @@ public class XL200Server {
         int resultCount = 0;
 
         try (BufferedInputStream in = new BufferedInputStream(socket.getInputStream()); BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream())) {
+            logger.info("Session started with {}:{}", socket.getInetAddress().getHostAddress(), socket.getPort());
 
             StringBuilder frame = new StringBuilder();
             int b;
@@ -57,6 +58,7 @@ public class XL200Server {
                     logger.debug("Received ENQ, sent ACK");
                 } else if (b == STX) {
                     frame.setLength(0);
+                    logger.debug("Start of new ASTM frame");
                 } else if (b == ETX) {
                     String message = frame.toString();
                     logger.debug("Received ASTM Frame: {}", message);
@@ -68,6 +70,7 @@ public class XL200Server {
                     }
                     out.write(ACK);
                     out.flush();
+                    logger.debug("Sent ACK for ASTM frame");
                 } else if (b == EOT) {
                     logger.debug("Received EOT.");
                     if (frame.length() > 0) {
@@ -81,6 +84,7 @@ public class XL200Server {
                         }
                         out.write(ACK);
                         out.flush();
+                        logger.debug("Sent ACK for frame at EOT");
                     }
                     frame.setLength(0);
                     // continue waiting for next transmission
@@ -96,6 +100,7 @@ public class XL200Server {
                 socket.close();
             } catch (IOException ignore) {
             }
+            logger.info("Connection with {}:{} closed", socket.getInetAddress().getHostAddress(), socket.getPort());
             Instant sessionEnd = Instant.now();
             long seconds = Duration.between(sessionStart, sessionEnd).getSeconds();
             logger.info("Session complete. Duration: {}s, Results: {}, Samples: {}", seconds, resultCount, sampleIds);
@@ -114,6 +119,7 @@ public class XL200Server {
         String currentSampleId = null;
 
         for (String rec : records) {
+            logger.debug("Processing record: {}", rec);
             if (rec.startsWith("P|")) {
                 PatientRecord pr = XL200Parsers.parsePatientRecord(rec);
                 db.setPatientRecord(pr);
@@ -123,7 +129,12 @@ public class XL200Server {
                 db.getQueryRecords().add(qr);
                 currentSampleId = qr.getSampleId();
                 // Forward query record to the LIMS to fetch any pending test orders
-                XL200LISCommunicator.pullTestOrdersForSampleRequests(qr);
+                DataBundle orders = XL200LISCommunicator.pullTestOrdersForSampleRequests(qr);
+                if (orders != null) {
+                    logger.debug("Received order bundle: {}", orders);
+                } else {
+                    logger.debug("No order bundle returned for sample {}", qr.getSampleId());
+                }
             } else if (rec.startsWith("O|")) {
                 // Order records may accompany results or be returned from the LIMS
                 OrderRecord or = XL200Parsers.parseOrderRecord(rec);
@@ -137,8 +148,11 @@ public class XL200Server {
         }
 
         if (!db.getResultsRecords().isEmpty()) {
+            logger.debug("Pushing {} result records to LIMS", db.getResultsRecords().size());
             boolean success = XL200LISCommunicator.pushResults(db);
-            if (!success && !XL200LISCommunicator.isIgnoreLimsResponse()) {
+            if (success) {
+                logger.debug("Results pushed successfully");
+            } else if (!XL200LISCommunicator.isIgnoreLimsResponse()) {
                 logger.warn("Failed to push results to LIMS");
             }
         }
