@@ -120,6 +120,8 @@ public class XL200Server {
                 QueryRecord qr = XL200Parsers.parseQueryRecord(rec);
                 db.getQueryRecords().add(qr);
                 currentSampleId = qr.getSampleId();
+                // Forward query record to the LIMS to fetch any pending test orders
+                XL200LISCommunicator.pullTestOrdersForSampleRequests(qr);
             } else if (rec.startsWith("R|")) {
                 ResultsRecord rr = XL200Parsers.parseResultsRecord(rec);
                 rr.setSampleId(currentSampleId);
