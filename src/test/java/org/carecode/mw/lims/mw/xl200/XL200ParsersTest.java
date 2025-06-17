@@ -11,4 +11,18 @@ class XL200ParsersTest {
         QueryRecord record = XL200Parsers.parseQueryRecord("Q|1|^1857128");
         assertEquals("1857128", record.getSampleId());
     }
+
+    @Test
+    void parseQueryRecord_extractsSampleIdWithMultipleCarets() {
+        QueryRecord record =
+            XL200Parsers.parseQueryRecord("Q|1|^^^1857128^|||");
+        assertEquals("1857128", record.getSampleId());
+    }
+
+    @Test
+    void parseQueryRecord_parsesMultipleRequestedTests() {
+        QueryRecord record =
+            XL200Parsers.parseQueryRecord("Q|1|^1857128||^^^GLU\\^^^UREA");
+        assertEquals("GLU,UREA", record.getTestCodes());
+    }
 }
