@@ -116,10 +116,11 @@ public class XL200Server {
             if (rec.startsWith("P|")) {
                 PatientRecord pr = XL200Parsers.parsePatientRecord(rec);
                 db.setPatientRecord(pr);
-            } else if (rec.startsWith("O|")) {
+            } else if (rec.startsWith("Q|")) {
                 QueryRecord qr = XL200Parsers.parseQueryRecord(rec);
                 db.getQueryRecords().add(qr);
                 currentSampleId = qr.getSampleId();
+                logger.debug("Query for sample ID: {}", currentSampleId);
                 // Forward query record to the LIMS to fetch any pending test orders
                 XL200LISCommunicator.pullTestOrdersForSampleRequests(qr);
             } else if (rec.startsWith("R|")) {
