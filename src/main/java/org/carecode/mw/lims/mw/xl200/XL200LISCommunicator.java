@@ -44,8 +44,11 @@ public class XL200LISCommunicator {
     public static DataBundle pullTestOrdersForSampleRequests(QueryRecord queryRecord) {
         logger.info("pullTestOrdersForSampleRequests");
         try {
-            String postSampleDataEndpoint = XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl();
-            URL url = new URL(postSampleDataEndpoint + "/test_orders_for_sample_requests");
+            String postSampleDataEndpoint =
+                XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl();
+            String endpoint = postSampleDataEndpoint + "/test_orders_for_sample_requests";
+            logger.info("Requesting test orders for sample {} from {}", queryRecord.getSampleId(), endpoint);
+            URL url = new URL(endpoint);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
@@ -63,19 +66,31 @@ public class XL200LISCommunicator {
             }
 
             int responseCode = conn.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
-                StringBuilder response = new StringBuilder();
-                String inputLine;
-
-                while ((inputLine = in.readLine()) != null) {
-                    response.append(inputLine);
+            InputStream responseStream = responseCode == HttpURLConnection.HTTP_OK
+                ? conn.getInputStream()
+                : conn.getErrorStream();
+            String responseBody = null;
+            if (responseStream != null) {
+                try (BufferedReader in = new BufferedReader(new InputStreamReader(responseStream, "utf-8"))) {
+                    StringBuilder response = new StringBuilder();
+                    String inputLine;
+                    while ((inputLine = in.readLine()) != null) {
+                        response.append(inputLine);
+                    }
+                    responseBody = response.toString();
                 }
-                in.close();
-
-                return gson.fromJson(response.toString(), DataBundle.class);
+            }
+            logger.debug("LIMS response code: {}", responseCode);
+            if (responseBody != null && !responseBody.isEmpty()) {
+                logger.debug("LIMS response body: {}", responseBody);
+            }
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                if (responseBody != null) {
+                    return gson.fromJson(responseBody, DataBundle.class);
+                }
+                return null;
             } else {
-                logger.error("POST request failed. Response code: " + responseCode);
+                logger.error("POST request failed. Response code: {}", responseCode);
             }
         } catch (Exception e) {
             logger.error("Exception in pullTestOrdersForSampleRequests", e);
