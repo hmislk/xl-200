@@ -1,105 +1,108 @@
 package org.carecode.mw.lims.mw.xl200;
 
-import com.google.gson.*;
-import java.io.*;
-import java.net.*;
-import java.text.SimpleDateFormat;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.carecode.lims.libraries.*;
+
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 public class XL200LISCommunicator {
 
     private static final Logger logger = LogManager.getLogger(XL200LISCommunicator.class);
     private static final Gson gson = new Gson();
+    private static final char STX = 0x02;
+    private static final char ETX = 0x03;
+    private static final char CR = 0x0D;
+    private static final char LF = 0x0A;
+    private static final char EOT = 0x04;
 
     public static DataBundle pullTestOrdersForSampleRequests(QueryRecord queryRecord) {
         logger.info("pullTestOrdersForSampleRequests");
         try {
             String baseUrl = XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl();
-            URL url = new URL(baseUrl + "/test_orders_for_sample_requests");
-            logger.info("Requesting test orders for sample {} from {}", queryRecord.getSampleId(), url);
+            logger.info("Requesting test orders for sample {} from {}", queryRecord.getSampleId(), baseUrl);
 
+            URL url = new URL(baseUrl + "/test_orders_for_sample_requests");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Accept", "application/json");
             conn.setDoOutput(true);
 
-            DataBundle bundle = new DataBundle();
-            bundle.setMiddlewareSettings(XL200SettingsLoader.getSettings());
-            bundle.getQueryRecords().add(queryRecord);
+            DataBundle databundle = new DataBundle();
+            databundle.setMiddlewareSettings(XL200SettingsLoader.getSettings());
+            databundle.getQueryRecords().add(queryRecord);
 
-            String json = gson.toJson(bundle);
+            String jsonInputString = gson.toJson(databundle);
             try (OutputStream os = conn.getOutputStream()) {
-                os.write(json.getBytes("utf-8"));
+                byte[] input = jsonInputString.getBytes("utf-8");
+                os.write(input, 0, input.length);
             }
 
-            int code = conn.getResponseCode();
-            logger.debug("LIMS response code: {}", code);
-            if (code == HttpURLConnection.HTTP_OK) {
+            int responseCode = conn.getResponseCode();
+            logger.debug("LIMS response code: {}", responseCode);
+
+            if (responseCode == HttpURLConnection.HTTP_OK) {
                 BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
                 StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = in.readLine()) != null) {
-                    response.append(line);
+                String inputLine;
+                while ((inputLine = in.readLine()) != null) {
+                    response.append(inputLine);
                 }
                 in.close();
+
                 logger.debug("LIMS response body: {}", response);
                 return gson.fromJson(response.toString(), DataBundle.class);
-            } else {
-                logger.error("POST request failed. Response code: {}", code);
             }
         } catch (Exception e) {
-            logger.error("Exception in pullTestOrdersForSampleRequests", e);
+            logger.error("Error in pullTestOrdersForSampleRequests", e);
         }
+
         return null;
     }
 
-    public static boolean pushResults(DataBundle dataBundle) {
+    public static boolean pushResults(DataBundle patientDataBundle) {
         try {
-            String baseUrl = XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl();
-            URL url = new URL(baseUrl + "/test_results");
-
+            String pushResultsEndpoint = XL200SettingsLoader.getSettings().getLimsSettings().getLimsServerBaseUrl() + "/test_results";
+            URL url = new URL(pushResultsEndpoint);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Accept", "application/json");
             conn.setDoOutput(true);
 
-            dataBundle.setMiddlewareSettings(XL200SettingsLoader.getSettings());
-            String json = gson.toJson(dataBundle);
+            patientDataBundle.setMiddlewareSettings(XL200SettingsLoader.getSettings());
+            String jsonInputString = gson.toJson(patientDataBundle);
 
             try (OutputStream os = conn.getOutputStream()) {
-                os.write(json.getBytes("utf-8"));
+                byte[] input = jsonInputString.getBytes("utf-8");
+                os.write(input, 0, input.length);
             }
 
-            int code = conn.getResponseCode();
-            if (code == HttpURLConnection.HTTP_OK) {
+            int responseCode = conn.getResponseCode();
+            logger.debug("Push result response code: {}", responseCode);
+
+            if (responseCode == HttpURLConnection.HTTP_OK) {
                 BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
                 StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = in.readLine()) != null) {
-                    response.append(line);
+                String inputLine;
+                while ((inputLine = in.readLine()) != null) {
+                    response.append(inputLine);
                 }
                 in.close();
 
-                JsonObject jsonObject = JsonParser.parseString(response.toString()).getAsJsonObject();
-                logger.info("Response from server: {}", jsonObject);
-
-                String status = jsonObject.get("status").getAsString();
-                logger.info("Status: {}", status);
-
-                JsonArray details = jsonObject.getAsJsonArray("details");
-                for (JsonElement el : details) {
-                    ResultsRecord r = gson.fromJson(el, ResultsRecord.class);
-                    logger.info("Sample ID: {}, Test: {}, Status: {}", r.getSampleId(), r.getTestCode(), r.getStatus());
-                }
+                JsonObject responseObject = JsonParser.parseString(response.toString()).getAsJsonObject();
+                logger.info("Response from server: {}", responseObject);
                 return true;
-            } else {
-                logger.error("POST request failed. Response code: {}", code);
             }
         } catch (Exception e) {
             logger.error("Exception in pushResults", e);
@@ -107,62 +110,74 @@ public class XL200LISCommunicator {
         return false;
     }
 
-    public static boolean isIgnoreLimsResponse() {
-        return false;
-    }
+    public static void sendAstmResponseBlock(DataBundle bundle, OutputStream out) throws IOException {
+        logger.info("Sending ASTM response for sample {}", bundle.getPatientRecord().getPatientId());
 
-    public static void sendAstmResponseBlock(DataBundle db, OutputStream out) throws IOException {
-        logger.info("Sending ASTM response for sample {}", db.getPatientRecord() != null ? db.getPatientRecord().getPatientId() : "UNKNOWN");
-
-        int frame = 1;
         List<String> lines = new ArrayList<>();
+        int frame = 1;
 
-        // Build ASTM lines
         lines.add(frame++ + "H|\\^&|||CareCode LIMS|||||||P");
-        if (db.getPatientRecord() != null) {
-            PatientRecord p = db.getPatientRecord();
+        if (bundle.getPatientRecord() != null) {
+            PatientRecord p = bundle.getPatientRecord();
             lines.add(frame++ + "P|1|" + p.getPatientId() + "||" + p.getAdditionalId() + "|" + p.getPatientName() + "|" + p.getPatientSex());
         }
-        for (OrderRecord o : db.getOrderRecords()) {
-            lines.add(frame++ + "O|1|" + o.getSampleId() + "||"
-                    + o.getTestNames().stream().map(t -> "^^^" + t).collect(Collectors.joining("\\")) + "|||||||"
-                    + o.getSpecimenCode());
+
+        for (OrderRecord o : bundle.getOrderRecords()) {
+            String testCodes = o.getTestNames().stream().map(t -> "^^^" + t).reduce((a, b) -> a + "\\" + b).orElse("");
+            lines.add(frame++ + "O|1|" + o.getSampleId() + "||" + testCodes + "|||||||S");
         }
+
         lines.add(frame++ + "L|1|N");
 
-        // Send each line
-        for (String l : lines) {
-            String raw = (char) 0x02 + l + (char) 0x0D + (char) 0x03;
-            String checksum = calculateChecksum(raw);
-            String message = raw + checksum + (char) 0x0D + (char) 0x0A;
-            out.write(message.getBytes());
+        for (String line : lines) {
+            String framed = buildAstmFrame(line);
+            out.write(framed.getBytes());
             out.flush();
-            logger.debug("Sent ASTM line: {}", l);
+            logger.debug("Sent ASTM line: {}", line);
+            try {
+                Thread.sleep(200); // slight delay to avoid analyzer overflow
+            } catch (InterruptedException ignored) {
+            }
         }
 
-        // Send EOT
-        out.write(0x04);  // EOT
+        out.write(EOT);
         out.flush();
         logger.info("EOT sent to complete ASTM block.");
     }
 
-// Helper: Same as Indiko
+    private static String buildAstmFrame(String line) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(STX);
+        sb.append(line);
+        sb.append(CR);
+        sb.append(ETX);
+        String checksum = calculateChecksum(sb.toString());
+        sb.append(checksum);
+        sb.append(CR).append(LF);
+        return sb.toString();
+    }
+
     public static String calculateChecksum(String frame) {
         int sum = 0;
         boolean start = false;
+
         for (char c : frame.toCharArray()) {
-            if (c == 0x02) {  // STX
+            if (c == STX) {
                 sum = 0;
                 start = true;
-            } else if (start) {
+                continue;
+            }
+            if (start) {
                 sum += c;
-                if (c == 0x03) {
-                    break;  // ETX
-                }
+                if (c == ETX) break;
             }
         }
-        String checksum = Integer.toHexString(sum % 256).toUpperCase();
-        return checksum.length() == 1 ? "0" + checksum : checksum;
+
+        String hex = Integer.toHexString(sum % 256).toUpperCase();
+        return hex.length() < 2 ? "0" + hex : hex;
     }
 
+    public static boolean isIgnoreLimsResponse() {
+        return false;
+    }
 }

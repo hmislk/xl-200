@@ -45,7 +45,8 @@ public class XL200Server {
         List<String> sampleIds = new ArrayList<>();
         int resultCount = 0;
 
-        try (BufferedInputStream in = new BufferedInputStream(socket.getInputStream()); BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream())) {
+        try (BufferedInputStream in = new BufferedInputStream(socket.getInputStream());
+             BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream())) {
             logger.info("Session started with {}:{}", socket.getInetAddress().getHostAddress(), socket.getPort());
 
             StringBuilder frame = new StringBuilder();
@@ -72,7 +73,6 @@ public class XL200Server {
                     out.write(ACK);
                     out.flush();
                     logger.debug("Sent ACK for ASTM frame");
-                    frame.setLength(0); // Clear buffer to avoid duplicate processing on EOT
                 } else if (b == EOT) {
                     logger.debug("Received EOT.");
                     if (frame.length() > 0) {
@@ -89,6 +89,7 @@ public class XL200Server {
                         logger.debug("Sent ACK for frame at EOT");
                     }
                     frame.setLength(0);
+                    // Keep connection open — do not close here
                 } else {
                     frame.append((char) b);
                 }
@@ -131,10 +132,14 @@ public class XL200Server {
             } else if (rec.startsWith("Q|")) {
                 logger.debug("Q {}", rec);
                 QueryRecord qr = XL200Parsers.parseQueryRecord(rec);
+                logger.debug("qr {}", qr);
                 db.getQueryRecords().add(qr);
                 currentSampleId = qr.getSampleId();
+                logger.debug("currentSampleId{}", currentSampleId);
                 DataBundle orders = XL200LISCommunicator.pullTestOrdersForSampleRequests(qr);
+                logger.debug("Q {}", orders);
                 if (orders != null && !orders.getOrderRecords().isEmpty()) {
+                    logger.debug("Received order bundle: {}", orders);
                     try {
                         XL200LISCommunicator.sendAstmResponseBlock(orders, out);
                     } catch (IOException e) {
