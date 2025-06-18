@@ -5,6 +5,7 @@ import java.io.*;
 import java.net.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.carecode.lims.libraries.*;
@@ -110,69 +111,58 @@ public class XL200LISCommunicator {
         return false;
     }
 
-    public static void sendAstmResponseBlock(DataBundle bundle, OutputStream out) throws IOException {
-        logger.info("Sending ASTM response for sample {}", bundle.getPatientRecord() != null ? bundle.getPatientRecord().getPatientId() : "Unknown");
+    public static void sendAstmResponseBlock(DataBundle db, OutputStream out) throws IOException {
+        logger.info("Sending ASTM response for sample {}", db.getPatientRecord() != null ? db.getPatientRecord().getPatientId() : "UNKNOWN");
 
-        List<String> lines = new ArrayList<>();
         int frame = 1;
+        List<String> lines = new ArrayList<>();
 
-        lines.add(frame++ + "H|\^&|||CareCode LIMS||||||||P");
-
-        if (bundle.getPatientRecord() != null) {
-            PatientRecord p = bundle.getPatientRecord();
-            lines.add(frame++ + "P|1|" + p.getPatientId() + "||" + p.getAdditionalId() + "||"
-                    + p.getPatientName() + "||" + p.getPatientSex());
+        // Build ASTM lines
+        lines.add(frame++ + "H|\\^&|||CareCode LIMS|||||||P");
+        if (db.getPatientRecord() != null) {
+            PatientRecord p = db.getPatientRecord();
+            lines.add(frame++ + "P|1|" + p.getPatientId() + "||" + p.getAdditionalId() + "|" + p.getPatientName() + "|" + p.getPatientSex());
         }
-
-        for (OrderRecord o : bundle.getOrderRecords()) {
-            String tests = String.join("\\", o.getTestNames());
-            lines.add(frame++ + "O|1|" + o.getSampleId() + "||^^^" + tests + "|||||||" + o.getSpecimenCode());
+        for (OrderRecord o : db.getOrderRecords()) {
+            lines.add(frame++ + "O|1|" + o.getSampleId() + "||"
+                    + o.getTestNames().stream().map(t -> "^^^" + t).collect(Collectors.joining("\\")) + "|||||||"
+                    + o.getSpecimenCode());
         }
-
         lines.add(frame++ + "L|1|N");
 
-        out.write(0x05); // ENQ
-        out.flush();
-
+        // Send each line
         for (String l : lines) {
-            String msg = buildAstmFrame(l);
-            out.write(msg.getBytes());
+            String raw = (char) 0x02 + l + (char) 0x0D + (char) 0x03;
+            String checksum = calculateChecksum(raw);
+            String message = raw + checksum + (char) 0x0D + (char) 0x0A;
+            out.write(message.getBytes());
             out.flush();
+            logger.debug("Sent ASTM line: {}", l);
         }
 
-        out.write(0x04); // EOT
+        // Send EOT
+        out.write(0x04);  // EOT
         out.flush();
-        logger.info("ASTM block sent.");
+        logger.info("EOT sent to complete ASTM block.");
     }
 
-    private static String buildAstmFrame(String line) {
-        char STX = 0x02;
-        char ETX = 0x03;
-        char CR = 0x0D;
-        char LF = 0x0A;
-
-        String body = STX + line + CR + ETX;
-        String checksum = calculateChecksum(body);
-        return body + checksum + CR + LF;
-    }
-
-    private static String calculateChecksum(String frame) {
+// Helper: Same as Indiko
+    public static String calculateChecksum(String frame) {
         int sum = 0;
         boolean start = false;
         for (char c : frame.toCharArray()) {
-            if (c == 0x02) {
+            if (c == 0x02) {  // STX
+                sum = 0;
                 start = true;
-                continue;
-            }
-            if (!start) {
-                continue;
-            }
-            sum += c;
-            if (c == 0x03) {
-                break;
+            } else if (start) {
+                sum += c;
+                if (c == 0x03) {
+                    break;  // ETX
+                }
             }
         }
-        String hex = Integer.toHexString(sum % 256).toUpperCase();
-        return hex.length() < 2 ? "0" + hex : hex;
+        String checksum = Integer.toHexString(sum % 256).toUpperCase();
+        return checksum.length() == 1 ? "0" + checksum : checksum;
     }
+
 }

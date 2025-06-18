@@ -46,7 +46,6 @@ public class XL200Server {
         int resultCount = 0;
 
         try (BufferedInputStream in = new BufferedInputStream(socket.getInputStream()); BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream())) {
-
             logger.info("Session started with {}:{}", socket.getInetAddress().getHostAddress(), socket.getPort());
 
             StringBuilder frame = new StringBuilder();
@@ -64,6 +63,7 @@ public class XL200Server {
                     String message = frame.toString();
                     logger.debug("Received ASTM Frame: {}", message);
                     List<String> records = splitRecords(message);
+                    logger.debug("records: {}", records);
                     DataBundle db = processRecords(records, out);
                     resultCount = db.getResultsRecords().size();
                     if (db.getPatientRecord() != null) {
@@ -72,6 +72,7 @@ public class XL200Server {
                     out.write(ACK);
                     out.flush();
                     logger.debug("Sent ACK for ASTM frame");
+                    frame.setLength(0); // Clear buffer to avoid duplicate processing on EOT
                 } else if (b == EOT) {
                     logger.debug("Received EOT.");
                     if (frame.length() > 0) {
