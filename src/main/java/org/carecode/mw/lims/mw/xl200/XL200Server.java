@@ -63,6 +63,7 @@ public class XL200Server {
                     String message = frame.toString();
                     logger.debug("Received ASTM Frame: {}", message);
                     List<String> records = splitRecords(message);
+                    logger.debug("records", records);
                     DataBundle db = processRecords(records);
                     resultCount = db.getResultsRecords().size();
                     if (db.getPatientRecord() != null) {
@@ -108,11 +109,14 @@ public class XL200Server {
     }
 
     private List<String> splitRecords(String msg) {
+        logger.debug("splitRecords");
         msg = msg.replace("\r", "\n").replaceAll("\n+", "\n");
         return Arrays.asList(msg.split("\n"));
     }
 
     private DataBundle processRecords(List<String> records) {
+        logger.debug("processRecords");
+        logger.debug("processRecords.records {}", records);
         DataBundle db = new DataBundle();
         db.setMiddlewareSettings(XL200SettingsLoader.getSettings());
 
@@ -123,13 +127,18 @@ public class XL200Server {
             if (rec.startsWith("P|")) {
                 PatientRecord pr = XL200Parsers.parsePatientRecord(rec);
                 db.setPatientRecord(pr);
+                logger.debug("P {}", pr);
             } else if (rec.startsWith("Q|")) {
+                logger.debug("Q {}", rec);
                 // ASTM query record from the analyser
                 QueryRecord qr = XL200Parsers.parseQueryRecord(rec);
+                logger.debug("qr {}", qr);
                 db.getQueryRecords().add(qr);
                 currentSampleId = qr.getSampleId();
+                logger.debug("currentSampleId{}", currentSampleId);
                 // Forward query record to the LIMS to fetch any pending test orders
                 DataBundle orders = XL200LISCommunicator.pullTestOrdersForSampleRequests(qr);
+                logger.debug("Q {}", orders);
                 if (orders != null) {
                     logger.debug("Received order bundle: {}", orders);
                 } else {
