@@ -46,6 +46,7 @@ public class XL200Server {
         int resultCount = 0;
 
         try (BufferedInputStream in = new BufferedInputStream(socket.getInputStream()); BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream())) {
+
             logger.info("Session started with {}:{}", socket.getInetAddress().getHostAddress(), socket.getPort());
 
             StringBuilder frame = new StringBuilder();
@@ -63,8 +64,7 @@ public class XL200Server {
                     String message = frame.toString();
                     logger.debug("Received ASTM Frame: {}", message);
                     List<String> records = splitRecords(message);
-                    logger.debug("records", records);
-                    DataBundle db = processRecords(records);
+                    DataBundle db = processRecords(records, out);
                     resultCount = db.getResultsRecords().size();
                     if (db.getPatientRecord() != null) {
                         sampleIds.add(db.getPatientRecord().getPatientId());
@@ -78,7 +78,7 @@ public class XL200Server {
                         String message = frame.toString();
                         logger.debug("Received ASTM Frame: {}", message);
                         List<String> records = splitRecords(message);
-                        DataBundle db = processRecords(records);
+                        DataBundle db = processRecords(records, out);
                         resultCount = db.getResultsRecords().size();
                         if (db.getPatientRecord() != null) {
                             sampleIds.add(db.getPatientRecord().getPatientId());
@@ -88,7 +88,6 @@ public class XL200Server {
                         logger.debug("Sent ACK for frame at EOT");
                     }
                     frame.setLength(0);
-                    // continue waiting for next transmission
                 } else {
                     frame.append((char) b);
                 }
@@ -114,7 +113,7 @@ public class XL200Server {
         return Arrays.asList(msg.split("\n"));
     }
 
-    private DataBundle processRecords(List<String> records) {
+    private DataBundle processRecords(List<String> records, OutputStream out) {
         logger.debug("processRecords");
         logger.debug("processRecords.records {}", records);
         DataBundle db = new DataBundle();
@@ -130,22 +129,20 @@ public class XL200Server {
                 logger.debug("P {}", pr);
             } else if (rec.startsWith("Q|")) {
                 logger.debug("Q {}", rec);
-                // ASTM query record from the analyser
                 QueryRecord qr = XL200Parsers.parseQueryRecord(rec);
-                logger.debug("qr {}", qr);
                 db.getQueryRecords().add(qr);
                 currentSampleId = qr.getSampleId();
-                logger.debug("currentSampleId{}", currentSampleId);
-                // Forward query record to the LIMS to fetch any pending test orders
                 DataBundle orders = XL200LISCommunicator.pullTestOrdersForSampleRequests(qr);
-                logger.debug("Q {}", orders);
-                if (orders != null) {
-                    logger.debug("Received order bundle: {}", orders);
+                if (orders != null && !orders.getOrderRecords().isEmpty()) {
+                    try {
+                        XL200LISCommunicator.sendAstmResponseBlock(orders, out);
+                    } catch (IOException e) {
+                        logger.error("Failed to send ASTM response block", e);
+                    }
                 } else {
                     logger.debug("No order bundle returned for sample {}", qr.getSampleId());
                 }
             } else if (rec.startsWith("O|")) {
-                // Order records may accompany results or be returned from the LIMS
                 OrderRecord or = XL200Parsers.parseOrderRecord(rec);
                 db.getOrderRecords().add(or);
                 currentSampleId = or.getSampleId();
