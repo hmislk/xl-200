@@ -153,7 +153,6 @@ public class XL200LISCommunicator {
         sb.append(STX);
         sb.append((char) ('0' + (frameNumber % 8)));
         sb.append(line);
-        sb.append(CR);
         sb.append(ETX);
         String checksum = calculateChecksum(sb.toString());
         sb.append(checksum);
