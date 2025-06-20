@@ -10,6 +10,7 @@ import java.net.Socket;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Consumer;
 
 public class XL200Server {
 
@@ -45,6 +46,7 @@ public class XL200Server {
         Instant sessionStart = Instant.now();
         List<String> sampleIds = new ArrayList<>();
         int resultCount = 0;
+        final String[] lastFrameSent = new String[1];
 
         try (BufferedInputStream in = new BufferedInputStream(socket.getInputStream());
              BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream())) {
@@ -62,6 +64,11 @@ public class XL200Server {
                     logger.debug("Received ACK from analyzer");
                 } else if (b == NAK) {
                     logger.warn("Received NAK from analyzer");
+                    if (lastFrameSent[0] != null) {
+                        out.write(lastFrameSent[0].getBytes());
+                        out.flush();
+                        logger.info("Retransmitted last frame due to NAK");
+                    }
                 } else if (b == STX) {
                     frame.setLength(0);
                     logger.debug("Start of new ASTM frame");
@@ -70,7 +77,7 @@ public class XL200Server {
                     logger.debug("Received ASTM Frame: {}", message);
                     List<String> records = splitRecords(message);
                     logger.debug("records: {}", records);
-                    DataBundle db = processRecords(records, out);
+                    DataBundle db = processRecords(records, out, frameStr -> lastFrameSent[0] = frameStr);
                     resultCount = db.getResultsRecords().size();
                     if (db.getPatientRecord() != null) {
                         sampleIds.add(db.getPatientRecord().getPatientId());
@@ -113,7 +120,7 @@ public class XL200Server {
         return Arrays.asList(msg.split("\n"));
     }
 
-    private DataBundle processRecords(List<String> records, OutputStream out) {
+    private DataBundle processRecords(List<String> records, OutputStream out, java.util.function.Consumer<String> sentCallback) {
         logger.debug("processRecords");
         logger.debug("processRecords.records {}", records);
         DataBundle db = new DataBundle();
@@ -139,7 +146,7 @@ public class XL200Server {
                 if (orders != null && !orders.getOrderRecords().isEmpty()) {
                     logger.debug("Received order bundle: {}", orders);
                     try {
-                        XL200LISCommunicator.sendAstmResponseBlock(orders, out);
+                        XL200LISCommunicator.sendAstmResponseBlock(orders, out, sentCallback);
                     } catch (IOException e) {
                         logger.error("Failed to send ASTM response block", e);
                     }
