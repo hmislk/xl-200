@@ -110,7 +110,7 @@ public class XL200LISCommunicator {
         return false;
     }
 
-    public static void sendAstmResponseBlock(DataBundle bundle, OutputStream out) throws IOException {
+    public static void sendAstmResponseBlock(DataBundle bundle, OutputStream out, java.util.function.Consumer<String> sentCallback) throws IOException {
         logger.info("Sending ASTM response for sample {}", bundle.getPatientRecord().getPatientId());
 
         List<String> records = new ArrayList<>();
@@ -133,6 +133,9 @@ public class XL200LISCommunicator {
             String framed = buildAstmFrame(frameNum, rec);
             out.write(framed.getBytes());
             out.flush();
+            if (sentCallback != null) {
+                sentCallback.accept(framed);
+            }
             logger.debug("Sent ASTM line: {}", rec);
 
             frameNum = (frameNum + 1) % 8;
