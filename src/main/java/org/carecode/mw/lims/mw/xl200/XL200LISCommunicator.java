@@ -149,15 +149,9 @@ public class XL200LISCommunicator {
     }
 
     private static String buildAstmFrame(int frameNumber, String line) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(STX);
-        sb.append((char) ('0' + (frameNumber % 8)));
-        sb.append(line);
-        sb.append(ETX);
-        String checksum = calculateChecksum(sb.toString());
-        sb.append(checksum);
-        sb.append(CR).append(LF);
-        return sb.toString();
+        String frame = "" + STX + (char) ('0' + (frameNumber % 8)) + line + ETX;
+        String checksum = calculateChecksum(frame);
+        return frame + checksum + CR + LF;
     }
 
     public static String calculateChecksum(String frame) {
