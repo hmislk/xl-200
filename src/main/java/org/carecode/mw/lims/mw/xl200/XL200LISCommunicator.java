@@ -113,27 +113,30 @@ public class XL200LISCommunicator {
     public static void sendAstmResponseBlock(DataBundle bundle, OutputStream out) throws IOException {
         logger.info("Sending ASTM response for sample {}", bundle.getPatientRecord().getPatientId());
 
-        List<String> lines = new ArrayList<>();
-        int frame = 1;
+        List<String> records = new ArrayList<>();
 
-        lines.add(frame++ + "H|\\^&|||CareCode LIMS|||||||P");
+        records.add("H|\\^&|||CareCode LIMS|||||||P");
         if (bundle.getPatientRecord() != null) {
             PatientRecord p = bundle.getPatientRecord();
-            lines.add(frame++ + "P|1|" + p.getPatientId() + "||" + p.getAdditionalId() + "|" + p.getPatientName() + "|" + p.getPatientSex());
+            records.add("P|1|" + p.getPatientId() + "||" + p.getAdditionalId() + "|" + p.getPatientName() + "|" + p.getPatientSex());
         }
 
         for (OrderRecord o : bundle.getOrderRecords()) {
             String testCodes = o.getTestNames().stream().map(t -> "^^^" + t).reduce((a, b) -> a + "\\" + b).orElse("");
-            lines.add(frame++ + "O|1|" + o.getSampleId() + "||" + testCodes + "|||||||S");
+            records.add("O|1|" + o.getSampleId() + "||" + testCodes + "||||||S");
         }
 
-        lines.add(frame++ + "L|1|N");
+        records.add("L|1|N");
 
-        for (String line : lines) {
-            String framed = buildAstmFrame(line);
+        int frameNum = 1;
+        for (String rec : records) {
+            String framed = buildAstmFrame(frameNum, rec);
             out.write(framed.getBytes());
             out.flush();
-            logger.debug("Sent ASTM line: {}", line);
+            logger.debug("Sent ASTM line: {}", rec);
+
+            frameNum = frameNum % 7 + 1; // cycle 1..7
+
             try {
                 Thread.sleep(200); // slight delay to avoid analyzer overflow
             } catch (InterruptedException ignored) {
@@ -145,9 +148,10 @@ public class XL200LISCommunicator {
         logger.info("EOT sent to complete ASTM block.");
     }
 
-    private static String buildAstmFrame(String line) {
+    private static String buildAstmFrame(int frameNumber, String line) {
         StringBuilder sb = new StringBuilder();
         sb.append(STX);
+        sb.append((char) ('0' + (frameNumber % 8)));
         sb.append(line);
         sb.append(CR);
         sb.append(ETX);

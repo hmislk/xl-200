@@ -20,6 +20,7 @@ public class XL200Server {
     private static final char ETX = 0x03;
     private static final char ENQ = 0x05;
     private static final char ACK = 0x06;
+    private static final char NAK = 0x15;
     private static final char EOT = 0x04;
 
     private ServerSocket serverSocket;
@@ -57,6 +58,10 @@ public class XL200Server {
                     out.write(ACK);
                     out.flush();
                     logger.debug("Received ENQ, sent ACK");
+                } else if (b == ACK) {
+                    logger.debug("Received ACK from analyzer");
+                } else if (b == NAK) {
+                    logger.warn("Received NAK from analyzer");
                 } else if (b == STX) {
                     frame.setLength(0);
                     logger.debug("Start of new ASTM frame");
@@ -89,7 +94,7 @@ public class XL200Server {
                         logger.debug("Sent ACK for frame at EOT");
                     }
                     frame.setLength(0);
-                    // Keep connection open — do not close here
+                    break;
                 } else {
                     frame.append((char) b);
                 }
