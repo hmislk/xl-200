@@ -135,7 +135,7 @@ public class XL200LISCommunicator {
             out.flush();
             logger.debug("Sent ASTM line: {}", rec);
 
-            frameNum = frameNum % 7 + 1; // cycle 1..7
+            frameNum = (frameNum + 1) % 8;
 
             try {
                 Thread.sleep(200); // slight delay to avoid analyzer overflow
