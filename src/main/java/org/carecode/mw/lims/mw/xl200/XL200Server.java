@@ -94,7 +94,6 @@ public class XL200Server {
                 } else if (b == EOT) {
                     logger.debug("Received EOT.");
                     frame.setLength(0);
-                    break;
                 } else {
                     frame.append((char) b);
                 }
