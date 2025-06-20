@@ -78,21 +78,14 @@ public class XL200Server {
                     out.write(ACK);
                     out.flush();
                     logger.debug("Sent ACK for ASTM frame");
+
+                    // Reset frame buffer and skip checksum and CR/LF
+                    frame.setLength(0);
+                    for (int i = 0; i < 4; i++) {
+                        in.read();
+                    }
                 } else if (b == EOT) {
                     logger.debug("Received EOT.");
-                    if (frame.length() > 0) {
-                        String message = frame.toString();
-                        logger.debug("Received ASTM Frame: {}", message);
-                        List<String> records = splitRecords(message);
-                        DataBundle db = processRecords(records, out);
-                        resultCount = db.getResultsRecords().size();
-                        if (db.getPatientRecord() != null) {
-                            sampleIds.add(db.getPatientRecord().getPatientId());
-                        }
-                        out.write(ACK);
-                        out.flush();
-                        logger.debug("Sent ACK for frame at EOT");
-                    }
                     frame.setLength(0);
                     break;
                 } else {
