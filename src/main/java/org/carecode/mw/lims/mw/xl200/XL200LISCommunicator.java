@@ -123,7 +123,8 @@ public class XL200LISCommunicator {
 
         for (OrderRecord o : bundle.getOrderRecords()) {
             String testCodes = o.getTestNames().stream().map(t -> "^^^" + t).reduce((a, b) -> a + "\\" + b).orElse("");
-            records.add("O|1|" + o.getSampleId() + "||" + testCodes + "||||||S");
+            String orderDate = o.getOrderDateTimeStr(); // Must be in ASTM format: YYYYMMDDHHMMSS
+            records.add("O|1|" + o.getSampleId() + "||" + testCodes + "||||" + orderDate + "||S|N");
         }
 
         records.add("L|1|N");
@@ -169,7 +170,9 @@ public class XL200LISCommunicator {
             }
             if (start) {
                 sum += c;
-                if (c == ETX) break;
+                if (c == ETX) {
+                    break;
+                }
             }
         }
 
