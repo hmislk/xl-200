@@ -24,6 +24,8 @@ public class XL200LISCommunicator {
     private static final char CR = 0x0D;
     private static final char LF = 0x0A;
     private static final char EOT = 0x04;
+    private static final char ACK = 0x06;
+    private static final char NAK = 0x15;
 
     public static DataBundle pullTestOrdersForSampleRequests(QueryRecord queryRecord) {
         logger.info("pullTestOrdersForSampleRequests");
@@ -110,12 +112,22 @@ public class XL200LISCommunicator {
         return false;
     }
 
-    public static void sendAstmResponseBlock(DataBundle bundle, OutputStream out, java.util.function.Consumer<String> sentCallback) throws IOException {
+    public static void sendAstmResponseBlock(DataBundle bundle, InputStream in, OutputStream out, java.util.function.Consumer<String> sentCallback) throws IOException {
         logger.info("Sending ASTM response for sample {}", bundle.getPatientRecord().getPatientId());
 
         List<String> records = new ArrayList<>();
 
-        records.add("H|\\^&|||CareCode LIMS|||||||P");
+        // Generate current timestamp for Header Field 14
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+        String currentTimestamp = sdf.format(new Date());
+
+        // Header: H|`^&|F3|F4|F5|F6|F7|F8|F9|F10|F11|F12|F13|F14
+        // Field 2: `^& (correct delimiters with backtick)
+        // Field 5: CareCode LIMS (sender name)
+        // Field 12: P (Processing ID - Production)
+        // Field 13: E 1394-97 (ASTM version - note the space, not hyphen)
+        // Field 14: Current timestamp (YYYYMMDDHHMMSS)
+        records.add("H|`^&|||CareCode LIMS|||||||P|E 1394-97|" + currentTimestamp);
         if (bundle.getPatientRecord() != null) {
             PatientRecord p = bundle.getPatientRecord();
             records.add("P|1|" + p.getPatientId() + "||" + p.getAdditionalId() + "|" + p.getPatientName() + "|" + p.getPatientSex());
@@ -125,9 +137,35 @@ public class XL200LISCommunicator {
             String testCodes = o.getTestNames().stream().map(t -> "^^^" + t).reduce((a, b) -> a + "\\" + b).orElse("");
             String orderDate = o.getOrderDateTimeStr(); // YYYYMMDDHHMMSS
             String specimenCode = (o.getSpecimenCode() != null && !o.getSpecimenCode().isEmpty()) ? o.getSpecimenCode() : "S";
-            // Order Record format: O|seq|specimenID|instSpecID|testID|priority|requestedDateTime|collectionDateTime|collectionEndTime|volume|collectorID|actionCode|dangerCode|clinicalInfo|receivedDateTime|specimenDescriptor|...
-            // Fields: 1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16
-            String line = String.format("O|1|%s||%s||%s|||||N||||%s", o.getSampleId(), testCodes, orderDate, specimenCode);
+
+            // Map specimen code to full descriptor name as expected by analyzer
+            String specimenDescriptor;
+            switch (specimenCode.toUpperCase()) {
+                case "S":
+                    specimenDescriptor = "SERUM";
+                    break;
+                case "P":
+                    specimenDescriptor = "PLASMA";
+                    break;
+                case "U":
+                    specimenDescriptor = "URINE";
+                    break;
+                case "W":
+                    specimenDescriptor = "WHOLE BLOOD";
+                    break;
+                default:
+                    specimenDescriptor = specimenCode;
+            }
+
+            // IMPORTANT: When LIMS sends orders to analyzer, use sample ID WITHOUT ^01 suffix
+            // The ^01 container suffix is only used BY the analyzer when it sends results back to LIMS
+            // Per manual example: Q|1|^10006122 -> O|1|10006122|IPat1|... (no ^01)
+            String specimenId = o.getSampleId();
+
+            // Order Record format: O|seq|specimenID|instSpecID|testID|priority|requestedDateTime|collectionDateTime|collectionEndTime|volume|collectorID|actionCode|dangerCode|clinicalInfo|receivedDateTime|specimenDescriptor|...|reportType
+            // Fields: 1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|...|26
+            // Mandatory fields for LIMS to ASTM: Priority(6)=R, OrderDate(7), ActionCode(12)=N, ReportType(26)=O
+            String line = String.format("O|1|%s||%s|R|%s|||||N|||%s|%s|||||||||O", specimenId, testCodes, orderDate, orderDate, specimenDescriptor);
             records.add(line);
         }
 
@@ -135,20 +173,56 @@ public class XL200LISCommunicator {
 
         int frameNum = 1;
         for (String rec : records) {
-            String framed = buildAstmFrame(frameNum, rec);
-            out.write(framed.getBytes());
-            out.flush();
-            if (sentCallback != null) {
-                sentCallback.accept(framed);
+            boolean frameAcknowledged = false;
+            int retryCount = 0;
+            final int MAX_RETRIES = 3;
+
+            while (!frameAcknowledged && retryCount < MAX_RETRIES) {
+                String framed = buildAstmFrame(frameNum, rec);
+                out.write(framed.getBytes());
+                out.flush();
+                if (sentCallback != null) {
+                    sentCallback.accept(framed);
+                }
+                logger.debug("Sent ASTM frame {}: {}", frameNum, rec);
+
+                // Wait for ACK or NAK from analyzer
+                long startTime = System.currentTimeMillis();
+                boolean receivedResponse = false;
+
+                while (System.currentTimeMillis() - startTime < 5000) { // 5 second timeout
+                    if (in.available() > 0) {
+                        int response = in.read();
+                        if (response == ACK) {
+                            logger.debug("Received ACK for frame {}", frameNum);
+                            frameAcknowledged = true;
+                            receivedResponse = true;
+                            break;
+                        } else if (response == NAK) {
+                            logger.warn("Received NAK for frame {}, will retry", frameNum);
+                            retryCount++;
+                            receivedResponse = true;
+                            break;
+                        }
+                    }
+                    try {
+                        Thread.sleep(50);
+                    } catch (InterruptedException ignored) {
+                    }
+                }
+
+                if (!receivedResponse) {
+                    logger.error("Timeout waiting for ACK/NAK for frame {}", frameNum);
+                    throw new IOException("Timeout waiting for acknowledgment from analyzer");
+                }
             }
-            logger.debug("Sent ASTM line: {}", rec);
+
+            if (!frameAcknowledged) {
+                logger.error("Failed to send frame {} after {} retries", frameNum, MAX_RETRIES);
+                throw new IOException("Failed to get acknowledgment after maximum retries");
+            }
 
             frameNum = (frameNum + 1) % 8;
-
-            try {
-                Thread.sleep(200); // slight delay to avoid analyzer overflow
-            } catch (InterruptedException ignored) {
-            }
         }
 
         out.write(EOT);

@@ -129,7 +129,7 @@ public class XL200Server {
 
                             if (receivedAck) {
                                 // Send the order response
-                                XL200LISCommunicator.sendAstmResponseBlock(this.pendingOrders, out, frameStr -> lastFrameSent[0] = frameStr);
+                                XL200LISCommunicator.sendAstmResponseBlock(this.pendingOrders, in, out, frameStr -> lastFrameSent[0] = frameStr);
                                 this.pendingOrders = null;
                             } else {
                                 logger.error("Timeout waiting for ACK from analyzer, order response not sent");
