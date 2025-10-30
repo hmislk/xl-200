@@ -123,8 +123,10 @@ public class XL200LISCommunicator {
 
         for (OrderRecord o : bundle.getOrderRecords()) {
             String testCodes = o.getTestNames().stream().map(t -> "^^^" + t).reduce((a, b) -> a + "\\" + b).orElse("");
-            String orderDate = o.getOrderDateTimeStr(); // Must be in ASTM format: YYYYMMDDHHMMSS
-            records.add("O|1|" + o.getSampleId() + "||" + testCodes + "||||" + orderDate + "||S|N");
+            String orderDate = o.getOrderDateTimeStr(); // YYYYMMDDHHMMSS
+            // Fully define all fields: sampleId, testCodes, orderDate, specimen (S), action code (N)
+            String line = String.format("O|1|%s||%s||||%s||S|N", o.getSampleId(), testCodes, orderDate);
+            records.add(line);
         }
 
         records.add("L|1|N");
