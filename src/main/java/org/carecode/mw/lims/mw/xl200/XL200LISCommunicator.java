@@ -124,8 +124,10 @@ public class XL200LISCommunicator {
         for (OrderRecord o : bundle.getOrderRecords()) {
             String testCodes = o.getTestNames().stream().map(t -> "^^^" + t).reduce((a, b) -> a + "\\" + b).orElse("");
             String orderDate = o.getOrderDateTimeStr(); // YYYYMMDDHHMMSS
-            // Fully define all fields: sampleId, testCodes, orderDate, specimen (S), action code (N)
-            String line = String.format("O|1|%s||%s||||%s||S|N", o.getSampleId(), testCodes, orderDate);
+            String specimenCode = (o.getSpecimenCode() != null && !o.getSpecimenCode().isEmpty()) ? o.getSpecimenCode() : "S";
+            // Order Record format: O|seq|specimenID|instSpecID|testID|priority|requestedDateTime|collectionDateTime|collectionEndTime|volume|collectorID|actionCode|dangerCode|clinicalInfo|receivedDateTime|specimenDescriptor|...
+            // Fields: 1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16
+            String line = String.format("O|1|%s||%s||%s|||||N||||%s", o.getSampleId(), testCodes, orderDate, specimenCode);
             records.add(line);
         }
 

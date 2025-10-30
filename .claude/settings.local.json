@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(git -C \"C:\\CCMW\\SysmaxXS500i\\sc\\xl-200\" log --oneline -20)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

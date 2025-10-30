@@ -82,6 +82,7 @@ public class XL200Server {
                     if (db.getPatientRecord() != null) {
                         sampleIds.add(db.getPatientRecord().getPatientId());
                     }
+
                     out.write(ACK);
                     out.flush();
                     logger.debug("Sent ACK for ASTM frame");
@@ -94,6 +95,49 @@ public class XL200Server {
                 } else if (b == EOT) {
                     logger.debug("Received EOT.");
                     frame.setLength(0);
+
+                    // Now send pending order response if any
+                    if (this.pendingOrders != null) {
+                        logger.info("Analyzer finished transmission, now sending order response");
+                        try {
+                            Thread.sleep(100); // Brief pause before initiating new session
+
+                            // Initiate new transmission session
+                            out.write(ENQ);
+                            out.flush();
+                            logger.debug("Sent ENQ to initiate order transmission");
+
+                            // Wait for ACK with timeout
+                            long startTime = System.currentTimeMillis();
+                            boolean receivedAck = false;
+                            while (System.currentTimeMillis() - startTime < 5000) {
+                                if (in.available() > 0) {
+                                    int response = in.read();
+                                    if (response == ACK) {
+                                        logger.debug("Received ACK from analyzer, proceeding with order transmission");
+                                        receivedAck = true;
+                                        break;
+                                    } else if (response == NAK) {
+                                        logger.warn("Received NAK from analyzer, retrying ENQ");
+                                        out.write(ENQ);
+                                        out.flush();
+                                        startTime = System.currentTimeMillis(); // Reset timeout
+                                    }
+                                }
+                                Thread.sleep(50);
+                            }
+
+                            if (receivedAck) {
+                                // Send the order response
+                                XL200LISCommunicator.sendAstmResponseBlock(this.pendingOrders, out, frameStr -> lastFrameSent[0] = frameStr);
+                                this.pendingOrders = null;
+                            } else {
+                                logger.error("Timeout waiting for ACK from analyzer, order response not sent");
+                            }
+                        } catch (Exception e) {
+                            logger.error("Error sending order response after EOT", e);
+                        }
+                    }
                 } else {
                     frame.append((char) b);
                 }
@@ -118,6 +162,8 @@ public class XL200Server {
         msg = msg.replace("\r", "\n").replaceAll("\n+", "\n");
         return Arrays.asList(msg.split("\n"));
     }
+
+    private DataBundle pendingOrders = null; // Store orders to send after EOT
 
     private DataBundle processRecords(List<String> records, OutputStream out, java.util.function.Consumer<String> sentCallback) {
         logger.debug("processRecords");
@@ -144,11 +190,9 @@ public class XL200Server {
                 logger.debug("Q {}", orders);
                 if (orders != null && !orders.getOrderRecords().isEmpty()) {
                     logger.debug("Received order bundle: {}", orders);
-                    try {
-                        XL200LISCommunicator.sendAstmResponseBlock(orders, out, sentCallback);
-                    } catch (IOException e) {
-                        logger.error("Failed to send ASTM response block", e);
-                    }
+                    // Store orders to send after EOT instead of sending immediately
+                    this.pendingOrders = orders;
+                    logger.info("Queued order response for sample {} - will send after receiving EOT", qr.getSampleId());
                 } else {
                     logger.debug("No order bundle returned for sample {}", qr.getSampleId());
                 }
